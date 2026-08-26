@@ -3,6 +3,7 @@ package com.videodownloader;
 import javax.swing.SwingUtilities;
 
 import com.formdev.flatlaf.FlatDarculaLaf;
+import com.videodownloader.controller.AppLogger;
 import com.videodownloader.controller.ClipboardMonitor;
 import com.videodownloader.controller.DependencyManager;
 import com.videodownloader.controller.DownloadManager;
@@ -13,6 +14,7 @@ import com.videodownloader.view.AppGUI;
 
 public class Program {
 	public static void main(String[] args) {
+		AppLogger.install();
 		FlatDarculaLaf.setup();
 
 		DependencyManager.checkAndDownloadDependencies();

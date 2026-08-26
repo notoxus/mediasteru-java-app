@@ -1,16 +1,14 @@
 package com.videodownloader.controller;
 
-import java.awt.Toolkit;
-import java.awt.datatransfer.StringSelection;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 
 import javax.swing.JOptionPane;
 
@@ -20,9 +18,78 @@ public class BrowserController {
 
 	private static final String BASE_CONFIG_PATH = System.getProperty("user.home") + File.separator
 			+ ".VideoDownloaderApp";
-	private static final String CHROME_PROFILE_PATH = BASE_CONFIG_PATH + File.separator + "ChromeProfile";
-	private static final String FIREFOX_PROFILE_PATH = BASE_CONFIG_PATH + File.separator + "FirefoxProfile";
+	// Browser profiles are disposable runtime state. Keep them out of the
+	// persistent app directory, which should contain only settings and assets.
+	private static final String CHROME_PROFILE_PATH = new File(System.getProperty("java.io.tmpdir"),
+			"VideoDownloaderChrome-" + UUID.randomUUID()).getAbsolutePath();
 	private static final File SETTINGS_FILE = new File(BASE_CONFIG_PATH, "settings.properties");
+	private static final String BROWSER_OVERRIDE_ENV = "VIDEO_DOWNLOADER_BROWSER";
+
+	private static final BrowserCandidate[] LINUX_CHROMIUM_BROWSERS = {
+			new BrowserCandidate("Google Chrome", "google-chrome"),
+			new BrowserCandidate("Google Chrome", "google-chrome-stable"),
+			new BrowserCandidate("Chromium", "chromium"),
+			new BrowserCandidate("Chromium", "chromium-browser"),
+			new BrowserCandidate("Helium", "helium"),
+			new BrowserCandidate("Brave", "brave-browser"),
+			new BrowserCandidate("Microsoft Edge", "microsoft-edge"),
+			new BrowserCandidate("Microsoft Edge", "microsoft-edge-stable"),
+			new BrowserCandidate("Vivaldi", "vivaldi"),
+			new BrowserCandidate("Vivaldi", "vivaldi-stable"),
+			new BrowserCandidate("Opera", "opera"),
+			new BrowserCandidate("Opera Beta", "opera-beta"),
+			new BrowserCandidate("Opera Developer", "opera-developer"),
+			new BrowserCandidate("Thorium", "thorium"),
+			new BrowserCandidate("Thorium", "thorium-browser"),
+			new BrowserCandidate("Ungoogled Chromium", "ungoogled-chromium")
+	};
+
+	private static final BrowserCandidate[] MAC_CHROMIUM_BROWSERS = {
+			new BrowserCandidate("Google Chrome", "Google Chrome"),
+			new BrowserCandidate("Chromium", "Chromium"),
+			new BrowserCandidate("Helium", "Helium"),
+			new BrowserCandidate("Brave", "Brave Browser"),
+			new BrowserCandidate("Microsoft Edge", "Microsoft Edge"),
+			new BrowserCandidate("Vivaldi", "Vivaldi"),
+			new BrowserCandidate("Opera", "Opera"),
+			new BrowserCandidate("Opera GX", "Opera GX"),
+			new BrowserCandidate("Thorium", "Thorium"),
+			new BrowserCandidate("Arc", "Arc")
+	};
+
+	private static final BrowserCandidate[] WINDOWS_CHROMIUM_BROWSERS = {
+			new BrowserCandidate("Google Chrome", "Google\\Chrome\\Application\\chrome.exe"),
+			new BrowserCandidate("Google Chrome Canary", "Google\\Chrome SxS\\Application\\chrome.exe"),
+			new BrowserCandidate("Chromium", "Chromium\\Application\\chrome.exe"),
+			new BrowserCandidate("Helium", "imput\\Helium\\Application\\chrome.exe"),
+			new BrowserCandidate("Helium", "imput\\Helium\\Application\\helium.exe"),
+			new BrowserCandidate("Brave", "BraveSoftware\\Brave-Browser\\Application\\brave.exe"),
+			new BrowserCandidate("Brave Beta", "BraveSoftware\\Brave-Browser-Beta\\Application\\brave.exe"),
+			new BrowserCandidate("Brave Nightly", "BraveSoftware\\Brave-Browser-Nightly\\Application\\brave.exe"),
+			new BrowserCandidate("Microsoft Edge", "Microsoft\\Edge\\Application\\msedge.exe"),
+			new BrowserCandidate("Microsoft Edge Beta", "Microsoft\\Edge Beta\\Application\\msedge.exe"),
+			new BrowserCandidate("Microsoft Edge Dev", "Microsoft\\Edge Dev\\Application\\msedge.exe"),
+			new BrowserCandidate("Vivaldi", "Vivaldi\\Application\\vivaldi.exe"),
+			new BrowserCandidate("Vivaldi", "Programs\\Vivaldi\\Application\\vivaldi.exe"),
+			new BrowserCandidate("Opera", "Programs\\Opera\\launcher.exe"),
+			new BrowserCandidate("Opera GX", "Programs\\Opera GX\\launcher.exe"),
+			new BrowserCandidate("Thorium", "Thorium\\Application\\thorium.exe"),
+			new BrowserCandidate("Thorium", "Programs\\Thorium\\Application\\thorium.exe"),
+			new BrowserCandidate("Ungoogled Chromium", "Ungoogled Chromium\\Application\\chrome.exe"),
+			new BrowserCandidate("Yandex Browser", "Yandex\\YandexBrowser\\Application\\browser.exe"),
+			new BrowserCandidate("Arc", "Programs\\Arc\\Arc.exe")
+	};
+
+	private static final String[] WINDOWS_BROWSER_EXECUTABLES = {
+			"chrome.exe", "chromium.exe", "helium.exe", "brave.exe", "msedge.exe", "vivaldi.exe",
+			"opera.exe", "thorium.exe", "browser.exe"
+	};
+
+	private record BrowserCandidate(String displayName, String executable) {
+	}
+
+	private record BrowserLaunch(String displayName, List<String> commandPrefix) {
+	}
 
 	private static BrowserEngine currentEngine = loadSavedEngine();
 
@@ -73,368 +140,209 @@ public class BrowserController {
 	}
 
 	public static BrowserEngine resolveActiveEngine() {
-		if (currentEngine != BrowserEngine.AUTO) {
-			return currentEngine;
-		}
-		if (isChromiumAvailable()) {
-			return BrowserEngine.CHROMIUM;
-		}
-		if (isFirefoxAvailable()) {
-			return BrowserEngine.MOZILLA;
-		}
 		return BrowserEngine.CHROMIUM;
 	}
 
 	public static boolean isChromiumAvailable() {
+		return findChromiumBrowser() != null;
+	}
+
+	private static BrowserLaunch findChromiumBrowser() {
+		BrowserLaunch override = findBrowserOverride();
+		if (override != null) {
+			return override;
+		}
+
 		String os = System.getProperty("os.name").toLowerCase();
 		if (os.contains("win")) {
-			return findWindowsExecutable("chrome.exe", "msedge.exe", "brave.exe") != null;
-		} else if (os.contains("mac")) {
-			return hasMacApp("Google Chrome", "Chromium", "Brave Browser", "Microsoft Edge");
-		} else {
-			return hasLinuxBinary("google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
-					"brave-browser", "microsoft-edge", "microsoft-edge-stable");
+			return findWindowsChromiumBrowser();
 		}
+		if (os.contains("mac")) {
+			return findMacChromiumBrowser();
+		}
+		return findLinuxChromiumBrowser();
 	}
 
-	public static boolean isFirefoxAvailable() {
-		String os = System.getProperty("os.name").toLowerCase();
-		if (os.contains("win")) {
-			return findWindowsExecutable("firefox.exe") != null;
-		} else if (os.contains("mac")) {
-			return hasMacApp("Firefox", "Firefox Developer Edition", "Firefox Nightly", "LibreWolf");
-		} else {
-			return hasLinuxBinary("firefox", "firefox-esr", "librewolf", "waterfox");
+	private static BrowserLaunch findBrowserOverride() {
+		String configured = System.getenv(BROWSER_OVERRIDE_ENV);
+		if (configured == null || configured.isBlank()) {
+			return null;
 		}
+		File configuredFile = new File(configured.trim());
+		if (configuredFile.isFile() && configuredFile.canExecute()) {
+			return new BrowserLaunch("Custom Chromium", List.of(configuredFile.getAbsolutePath()));
+		}
+		File onPath = findExecutableOnPath(configured.trim());
+		return onPath == null ? null : new BrowserLaunch("Custom Chromium", List.of(onPath.getAbsolutePath()));
 	}
 
-	private static boolean hasLinuxBinary(String... binaries) {
-		for (String bin : binaries) {
-			File f = new File("/usr/bin", bin);
-			if (f.exists() && f.canExecute()) {
-				return true;
-			}
-			File fLocal = new File("/usr/local/bin", bin);
-			if (fLocal.exists() && fLocal.canExecute()) {
-				return true;
-			}
-			File fSnap = new File("/snap/bin", bin);
-			if (fSnap.exists() && fSnap.canExecute()) {
-				return true;
+	private static BrowserLaunch findLinuxChromiumBrowser() {
+		for (BrowserCandidate candidate : LINUX_CHROMIUM_BROWSERS) {
+			File executable = findExecutableOnPath(candidate.executable());
+			if (executable != null) {
+				return new BrowserLaunch(candidate.displayName(), List.of(executable.getAbsolutePath()));
 			}
 		}
-		// Fallback test via 'which'
-		for (String bin : binaries) {
-			try {
-				Process p = new ProcessBuilder("which", bin).start();
-				if (p.waitFor() == 0) {
-					return true;
-				}
-			} catch (Exception ignored) {
-			}
-		}
-		return false;
+
+		File appImage = findLinuxBrowserAppImage();
+		return appImage == null ? null : new BrowserLaunch(appImage.getName(), List.of(appImage.getAbsolutePath()));
 	}
 
-	private static String findLinuxBinary(String... binaries) {
-		for (String bin : binaries) {
-			File f = new File("/usr/bin", bin);
-			if (f.exists() && f.canExecute()) {
-				return f.getAbsolutePath();
-			}
-			File fLocal = new File("/usr/local/bin", bin);
-			if (fLocal.exists() && fLocal.canExecute()) {
-				return fLocal.getAbsolutePath();
-			}
-			File fSnap = new File("/snap/bin", bin);
-			if (fSnap.exists() && fSnap.canExecute()) {
-				return fSnap.getAbsolutePath();
-			}
+	private static File findExecutableOnPath(String executableName) {
+		if (executableName == null || executableName.isBlank()) {
+			return null;
 		}
-		for (String bin : binaries) {
-			try {
-				Process p = new ProcessBuilder("which", bin).start();
-				if (p.waitFor() == 0) {
-					return bin;
-				}
-			} catch (Exception ignored) {
-			}
-		}
-		return binaries.length > 0 ? binaries[0] : "google-chrome";
-	}
-
-	private static boolean hasMacApp(String... appNames) {
-		for (String name : appNames) {
-			if (new File("/Applications/" + name + ".app").exists()
-					|| new File(System.getProperty("user.home") + "/Applications/" + name + ".app").exists()) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private static String findMacApp(String fallback, String... appNames) {
-		for (String name : appNames) {
-			if (new File("/Applications/" + name + ".app").exists()
-					|| new File(System.getProperty("user.home") + "/Applications/" + name + ".app").exists()) {
-				return name;
-			}
-		}
-		return fallback;
-	}
-
-	private static String findWindowsExecutable(String... exeNames) {
-		String[] prefixes = {
-				System.getenv("ProgramFiles"),
-				System.getenv("ProgramFiles(x86)"),
-				System.getenv("LocalAppData")
+		String userHome = System.getProperty("user.home");
+		String[] standardDirectories = {
+				"/usr/bin", "/usr/local/bin", "/snap/bin", new File(userHome, ".local/bin").getAbsolutePath()
 		};
-		String[] subDirs = {
-				"Google\\Chrome\\Application\\chrome.exe",
-				"Microsoft\\Edge\\Application\\msedge.exe",
-				"BraveSoftware\\Brave-Browser\\Application\\brave.exe",
-				"Mozilla Firefox\\firefox.exe"
-		};
-
-		for (String exe : exeNames) {
-			for (String prefix : prefixes) {
-				if (prefix == null) {
-					continue;
-				}
-				for (String sub : subDirs) {
-					if (sub.endsWith(exe)) {
-						File f = new File(prefix, sub);
-						if (f.exists()) {
-							return f.getAbsolutePath();
-						}
-					}
-				}
+		for (String directory : standardDirectories) {
+			File candidate = new File(directory, executableName);
+			if (candidate.isFile() && candidate.canExecute()) {
+				return candidate;
+			}
+		}
+		String path = System.getenv("PATH");
+		if (path == null || path.isBlank()) {
+			return null;
+		}
+		for (String directory : path.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+			if (directory.isBlank()) {
+				continue;
+			}
+			File candidate = new File(directory, executableName);
+			if (candidate.isFile() && candidate.canExecute()) {
+				return candidate;
 			}
 		}
 		return null;
 	}
 
-	private static ProcessBuilder getChromiumProcess(String... extraArgs) {
-		String os = System.getProperty("os.name").toLowerCase();
-		List<String> command = new ArrayList<>();
-
-		if (os.contains("win")) {
-			String winExe = findWindowsExecutable("chrome.exe", "msedge.exe", "brave.exe");
-			if (winExe != null) {
-				command.add(winExe);
-			} else {
-				command.add("cmd");
-				command.add("/c");
-				command.add("start");
-				command.add("\"\"");
-				command.add("chrome");
+	private static File findLinuxBrowserAppImage() {
+		String userHome = System.getProperty("user.home");
+		File[] directories = {
+				new File(userHome, "Applications"),
+				new File(userHome, ".local/bin"),
+				new File(userHome, "Downloads")
+		};
+		String[] browserNames = {
+				"helium", "chrome", "chromium", "brave", "vivaldi", "opera", "thorium"
+		};
+		for (File directory : directories) {
+			File[] matches = directory.listFiles(file -> {
+				if (!file.isFile() || !file.canExecute()) {
+					return false;
+				}
+				String lowerName = file.getName().toLowerCase();
+				if (!lowerName.endsWith(".appimage")) {
+					return false;
+				}
+				for (String browserName : browserNames) {
+					if (lowerName.contains(browserName)) {
+						return true;
+					}
+				}
+				return false;
+			});
+			if (matches != null && matches.length > 0) {
+				Arrays.sort(matches, (left, right) -> Long.compare(right.lastModified(), left.lastModified()));
+				return matches[0];
 			}
-		} else if (os.contains("mac")) {
-			String app = findMacApp("Google Chrome", "Google Chrome", "Chromium", "Brave Browser", "Microsoft Edge");
-			command.add("open");
-			command.add("-a");
-			command.add(app);
-			command.add("--args");
-		} else {
-			String bin = findLinuxBinary("google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
-					"brave-browser", "microsoft-edge", "microsoft-edge-stable");
-			command.add(bin);
 		}
-
-		command.addAll(Arrays.asList(extraArgs));
-		return new ProcessBuilder(command);
+		return null;
 	}
 
-	private static ProcessBuilder getFirefoxProcess(String... extraArgs) {
-		String os = System.getProperty("os.name").toLowerCase();
-		List<String> command = new ArrayList<>();
-
-		if (os.contains("win")) {
-			String winExe = findWindowsExecutable("firefox.exe");
-			if (winExe != null) {
-				command.add(winExe);
-			} else {
-				command.add("cmd");
-				command.add("/c");
-				command.add("start");
-				command.add("\"\"");
-				command.add("firefox");
+	private static BrowserLaunch findMacChromiumBrowser() {
+		String userHome = System.getProperty("user.home");
+		for (BrowserCandidate candidate : MAC_CHROMIUM_BROWSERS) {
+			String appName = candidate.executable() + ".app";
+			if (new File("/Applications", appName).isDirectory()
+					|| new File(new File(userHome, "Applications"), appName).isDirectory()) {
+				return new BrowserLaunch(candidate.displayName(),
+						List.of("open", "-a", candidate.executable(), "--args"));
 			}
-		} else if (os.contains("mac")) {
-			String app = findMacApp("Firefox", "Firefox", "Firefox Developer Edition", "Firefox Nightly", "LibreWolf");
-			command.add("open");
-			command.add("-a");
-			command.add(app);
-			command.add("--args");
-		} else {
-			String bin = findLinuxBinary("firefox", "firefox-esr", "librewolf", "waterfox");
-			command.add(bin);
 		}
-
-		command.addAll(Arrays.asList(extraArgs));
-		return new ProcessBuilder(command);
+		return null;
 	}
 
-	private static void prepareFirefoxProfile(File profileDir) {
-		try {
-			if (!profileDir.exists()) {
-				profileDir.mkdirs();
+	private static BrowserLaunch findWindowsChromiumBrowser() {
+		String[] roots = {
+				System.getenv("ProgramFiles"),
+				System.getenv("ProgramFiles(x86)"),
+				System.getenv("ProgramW6432"),
+				System.getenv("LocalAppData")
+		};
+		for (BrowserCandidate candidate : WINDOWS_CHROMIUM_BROWSERS) {
+			for (String root : roots) {
+				if (root == null || root.isBlank()) {
+					continue;
+				}
+				File executable = new File(root, candidate.executable());
+				if (executable.isFile()) {
+					return new BrowserLaunch(candidate.displayName(), List.of(executable.getAbsolutePath()));
+				}
 			}
-			File userJs = new File(profileDir, "user.js");
-			String config = """
-					user_pref("browser.aboutConfig.showWarning", false);
-					user_pref("browser.shell.checkDefaultBrowser", false);
-					user_pref("browser.startup.homepage_override.mstone", "ignore");
-					user_pref("datareporting.policy.firstRunURL", "");
-					user_pref("trailhead.firstrun.branches", "nofirstrun-empty");
-					user_pref("devtools.chrome.enabled", true);
-					user_pref("devtools.debugger.remote-enabled", true);
-					user_pref("extensions.autoDisableScopes", 0);
-					user_pref("extensions.enabledScopes", 15);
-					user_pref("xpinstall.signatures.required", false);
-					user_pref("extensions.experiments.enabled", true);
-					""";
-			try (FileWriter fw = new FileWriter(userJs)) {
-				fw.write(config);
-			}
-		} catch (IOException e) {
-			System.err.println("[FirefoxProfile] Error writing user.js: " + e.getMessage());
 		}
+		for (String executableName : WINDOWS_BROWSER_EXECUTABLES) {
+			File executable = findExecutableOnPath(executableName);
+			if (executable != null) {
+				return new BrowserLaunch(executableName, List.of(executable.getAbsolutePath()));
+			}
+		}
+		return null;
+	}
+
+	private static ProcessBuilder getChromiumProcess(BrowserLaunch browser, String... extraArgs) {
+		List<String> command = new ArrayList<>(browser.commandPrefix());
+		command.addAll(Arrays.asList(extraArgs));
+		return new ProcessBuilder(command);
 	}
 
 	public static void autoSetupExtensionChromium() {
-		String extPath = ExtensionManager.getExtensionPath(BrowserEngine.CHROMIUM);
 		try {
-			System.out.println("\n[System] Preparing for first Chromium setup...");
-			StringSelection stringSelection = new StringSelection(extPath);
-			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
-			String preMessage = "This is the first time you use catching link address automatically with Chromium!\n\n"
-					+ "When the browser pop up. You are compulsory to do:\n"
-					+ "👉 Look at the TOP RIGHT CORNER on your browser.\n"
-					+ "👉 Switching the Developer mode toggle on.\n\n" + "Press OK to start open the browser.";
-			JOptionPane.showMessageDialog(null, preMessage, "Step 1: Setting up Chromium Hunter",
-					JOptionPane.WARNING_MESSAGE);
-
-			ProcessBuilder pb = getChromiumProcess("--user-data-dir=" + CHROME_PROFILE_PATH,
-					"--load-extension=" + extPath, "chrome://extensions/");
-			pb.start();
-
-			String postMessage = "After you have successfully enabled 'Developer mode',\n"
-					+ "Please check if the 'Video Hunter' extension has appeared.\n\n"
-					+ "If you see it, click OK here to start downloading the video/playlist!";
-			JOptionPane.showMessageDialog(null, postMessage, "Step 2: Verification", JOptionPane.INFORMATION_MESSAGE);
-
-			File profile = new File(CHROME_PROFILE_PATH);
-			profile.mkdirs();
-			new File(profile, "setup_done.txt").createNewFile();
-
+			launchChromium("chrome://extensions/");
 			System.out.println("Chromium setup completed! Ready status.");
-
 		} catch (Exception e) {
 			System.err.println("Error Chromium setup: " + e.getMessage());
 		}
 	}
 
-	public static void autoSetupExtensionFirefox() {
-		String extPath = ExtensionManager.getExtensionPath(BrowserEngine.MOZILLA);
-		File manifestFile = new File(extPath, "manifest.json");
-		try {
-			System.out.println("\n[System] Preparing for first Mozilla Firefox setup...");
-			File profileDir = new File(FIREFOX_PROFILE_PATH);
-			prepareFirefoxProfile(profileDir);
-
-			StringSelection stringSelection = new StringSelection(manifestFile.getAbsolutePath());
-			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
-
-			String preMessage = "This is the first time you use Hunting Mode with Mozilla Firefox!\n\n"
-					+ "Firefox will open the debugging page.\n"
-					+ "👉 The path to 'manifest.json' has been copied to your clipboard!\n"
-					+ "👉 Click 'This Firefox' on the left menu.\n"
-					+ "👉 Click 'Load Temporary Add-on...'\n"
-					+ "👉 Paste or select the 'manifest.json' file.\n\n"
-					+ "Press OK to launch Firefox.";
-			JOptionPane.showMessageDialog(null, preMessage, "Step 1: Setting up Firefox Hunter",
-					JOptionPane.INFORMATION_MESSAGE);
-
-			ProcessBuilder pb = getFirefoxProcess("-profile", profileDir.getAbsolutePath(), "-no-remote",
-					"about:debugging#/runtime/this-firefox");
-			pb.start();
-
-			String postMessage = "After loading the 'Video Hunter' add-on in Firefox,\n"
-					+ "Click OK here to start hunting videos!";
-			JOptionPane.showMessageDialog(null, postMessage, "Step 2: Verification", JOptionPane.INFORMATION_MESSAGE);
-
-			new File(profileDir, "setup_done.txt").createNewFile();
-
-			System.out.println("Firefox setup completed! Ready status.");
-		} catch (Exception e) {
-			System.err.println("Error Firefox setup: " + e.getMessage());
-		}
-	}
-
 	public static void autoSetupExtension() {
-		BrowserEngine engine = resolveActiveEngine();
-		if (engine == BrowserEngine.MOZILLA) {
-			autoSetupExtensionFirefox();
-		} else {
-			autoSetupExtensionChromium();
-		}
+		autoSetupExtensionChromium();
 	}
 
 	public static void openCaptureBrowser(String url) {
-		BrowserEngine engine = resolveActiveEngine();
 		String targetUrl = url == null || url.trim().isEmpty() ? "https://www.google.com" : url.trim();
-
-		if (engine == BrowserEngine.MOZILLA) {
-			openFirefoxCapture(targetUrl);
-		} else {
-			openChromiumCapture(targetUrl);
-		}
+		openChromiumCapture(targetUrl);
 	}
 
 	private static void openChromiumCapture(String targetUrl) {
-		String extPath = ExtensionManager.getExtensionPath(BrowserEngine.CHROMIUM);
-		File profileDir = new File(CHROME_PROFILE_PATH);
-		File setupDone = new File(profileDir, "setup_done.txt");
-
-		if (!setupDone.exists()) {
-			autoSetupExtensionChromium();
-		}
-
 		try {
 			System.out.println("Deploying Auto-Capture Browser (Chromium) to: " + targetUrl);
-			ProcessBuilder pb = getChromiumProcess("--user-data-dir=" + CHROME_PROFILE_PATH,
-					"--load-extension=" + extPath, "--no-first-run", "--no-default-browser-check", targetUrl);
-			pb.start();
+			launchChromium(targetUrl);
 		} catch (Exception e) {
 			System.err.println("Error launching Chromium: " + e.getMessage());
 			JOptionPane.showMessageDialog(null,
 					"Could not launch Chromium-based browser: " + e.getMessage()
-							+ "\nPlease verify Chrome/Chromium is installed or switch engine to Mozilla Firefox.",
+							+ "\nPlease install a Chromium-based browser such as Helium, Chrome, Chromium, Brave, Edge, Vivaldi, Opera, or Thorium.",
 					"Browser Launch Error", JOptionPane.ERROR_MESSAGE);
 		}
 	}
 
-	private static void openFirefoxCapture(String targetUrl) {
-		File profileDir = new File(FIREFOX_PROFILE_PATH);
-		prepareFirefoxProfile(profileDir);
-		File setupDone = new File(profileDir, "setup_done.txt");
-
-		if (!setupDone.exists()) {
-			autoSetupExtensionFirefox();
+	private static void launchChromium(String targetUrl) throws IOException {
+		BrowserLaunch browser = findChromiumBrowser();
+		if (browser == null) {
+			throw new IOException("No Chromium-based browser was found");
 		}
-
-		try {
-			System.out.println("Deploying Auto-Capture Browser (Mozilla Firefox) to: " + targetUrl);
-			ProcessBuilder pb = getFirefoxProcess("-profile", profileDir.getAbsolutePath(), "-no-remote",
-					"-new-instance", targetUrl);
-			pb.start();
-		} catch (Exception e) {
-			System.err.println("Error launching Firefox: " + e.getMessage());
-			JOptionPane.showMessageDialog(null,
-					"Could not launch Mozilla Firefox: " + e.getMessage()
-							+ "\nPlease verify Firefox is installed or switch engine to Chromium.",
-					"Browser Launch Error", JOptionPane.ERROR_MESSAGE);
+		System.out.println("[Hunter] Using Chromium browser: " + browser.displayName());
+		String extPath = ExtensionManager.getExtensionPath();
+		File profileDir = new File(CHROME_PROFILE_PATH);
+		if (!profileDir.exists() && !profileDir.mkdirs()) {
+			throw new IOException("Could not create temporary Chromium profile");
 		}
+		ProcessBuilder pb = getChromiumProcess(browser, "--user-data-dir=" + CHROME_PROFILE_PATH,
+				"--load-extension=" + extPath, "--no-first-run", "--no-default-browser-check", targetUrl);
+		pb.start();
 	}
+
 }

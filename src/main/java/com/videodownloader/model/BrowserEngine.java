@@ -2,8 +2,7 @@ package com.videodownloader.model;
 
 public enum BrowserEngine {
 	AUTO("Auto Detect"),
-	CHROMIUM("Chromium / Chrome"),
-	MOZILLA("Mozilla Firefox");
+	CHROMIUM("Chromium / Chrome");
 
 	private final String displayName;
 

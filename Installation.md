@@ -4,7 +4,7 @@ Welcome to the setup guide for **Video Downloader**! The application is **Plug &
 
 ## Step 1: Requirements
 
-* **Google Chrome:** Required only for the browser extension "Hunting" mode.
+* **Browser Hunting:** Requires a Chromium-based browser, including Helium, Google Chrome, Chromium, Brave, Microsoft Edge, Vivaldi, Opera, Thorium, and compatible derivatives. The app loads its Hunting extension automatically; no manual `manifest.json` setup is needed. On Linux, executable browser AppImages in `~/Applications`, `~/.local/bin`, or `~/Downloads` are also detected.
 * **No Java needed!** A trimmed Java 21 Runtime Environment (JRE) is bundled inside every release package.
   * If the JRE is somehow missing, the launcher will **automatically download it** from [Adoptium](https://adoptium.net) on first run (internet required for that one-time step only).
 
@@ -30,7 +30,10 @@ Once extracted, your installation folder contains:
 * **Core App:** `VideoDownloader.jar` — the main compiled application.
 * **Launcher Script:** `run.bat` (Windows) or `run.sh` (Mac/Linux) — starts the app.
 * **Embedded Runtime:** A trimmed JRE 21 tailored for your platform, built automatically by CI using `jlink`.
-* **Engine Tools:** `yt-dlp` and `ffmpeg` binaries for downloading and converting.
+* **Engine Tools:** checksum-verified `yt-dlp`, `ffmpeg`, and `deno` binaries
+  selected specifically for the package's OS and CPU architecture.
+* **Dependency Manifest:** `tools-manifest.json`, the exact version and hash
+  record used by both local development and GitHub release builds.
 
 ---
 

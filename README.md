@@ -23,11 +23,42 @@ No Java installation required — a bundled JRE is included.
 
 ---
 
+## Electron / Wayland Preview
+
+A new Electron desktop client is being developed alongside the Swing application. It uses Chromium's native Wayland backend and contains its own temporary Hunting window, so this preview does not require a browser extension or an installed Chromium-family browser.
+
+```bash
+cd electron
+npm install
+npm start
+```
+
+The first start synchronizes the checksum-verified yt-dlp, FFmpeg, and Deno
+binaries for the current OS/CPU. They are stored in the ignored `tools/`
+directory, so developers do not commit large binaries or update them manually.
+
+```bash
+cd electron
+npm run tools:sync   # download/update this machine
+npm run tools:check  # offline checksum verification
+npm run tools:update # refresh manifest + update this machine
+```
+
+The same update can be run from the repository root on every platform:
+
+```bash
+node scripts/update-local-tools.mjs
+```
+
+See [`electron/README.md`](electron/README.md) for implemented features and the remaining migration work. The Swing client remains the release client until feature parity is reached.
+
+---
+
 ## Features
 
 | Feature | Description |
 |---|---|
-| **Browser Hunting** | Intercepts HLS/DASH stream URLs as you browse via Chrome/Chromium or Mozilla Firefox extension |
+| **Browser Hunting** | Intercepts HLS/DASH stream URLs as you browse via a Chromium-based browser extension |
 | **Direct Download** | YouTube, TikTok, Facebook, Instagram — extracted directly via yt-dlp |
 | **Clipboard Monitor** | Background thread watches your clipboard; paste a URL and it auto-queues |
 | **Bulk Import** | Import an API JSON with multiple episodes to queue an entire series |
@@ -54,11 +85,11 @@ No Java installation required — a bundled JRE is included.
 Many sites load video streams dynamically without a shareable URL. Hunting mode captures these.
 
 1. Leave the input field **empty** and press **Enter**, or paste the site URL and press **Enter**.
-2. A dedicated Chrome window opens and navigates to the page.
+2. A dedicated browser window opens and navigates to the page.
 3. Play the video — the extension intercepts the stream URL (`.m3u8`, DASH, or any `application/x-mpegURL` response).
 4. The tab closes automatically and the download starts.
 
-> **First run only:** Chrome will ask you to enable Developer Mode and load the extension. Follow the on-screen instructions — this is a one-time step.
+> The app loads the extension automatically in a disposable Chromium profile; you do not need to find or select `manifest.json`.
 
 ### Method 3 — Clipboard Monitor
 
@@ -77,7 +108,7 @@ Notes:
 
 ### Method 4 — Bulk API JSON Import
 
-Click **Import API JSON** and paste a payload in this format:
+Click **Import List** and paste a payload in this format:
 
 ```json
 {
@@ -93,7 +124,7 @@ Click **Import API JSON** and paste a payload in this format:
 }
 ```
 
-All episodes are queued at once. Select them in the table and click **Download Selected**.
+All episodes are queued at once. Select them in the table and click **Start Selected**.
 
 ---
 
@@ -106,21 +137,25 @@ The queue table shows all pending and active downloads:
 | **Ord No.** | Position in queue |
 | **Link** | Source URL |
 | **Format** | MP4 / MKV / MP3 |
-| **Status** | Pending / In Queue / Downloading / Done / Error |
+| **Status** | Pending / In Queue / Downloading / Done / Failed |
 | **Progress** | Live download percentage |
 | **×** | Remove from queue (cannot remove active downloads) |
 
-Select one or more rows and click **Download Selected** to start them.
+Select one or more rows and click **Start Selected** to start them.
 
 ---
 
 ## How Hunting Works (Technical)
 
-The app generates a Chrome extension at `~/.VideoDownloaderApp/Extension/` and loads it into a dedicated Chrome profile. The extension hooks into Chrome's `webRequest` API with two interception layers:
+The app generates a Chromium extension at `~/.VideoDownloaderApp/Extension/chromium/` and loads it into a disposable browser profile under the system temporary directory. The extension hooks into the browser's `webRequest` API with two interception layers:
+
+The launcher recognizes common Chromium-family browsers on Windows, macOS, and Linux, including Helium. For an uncommon derivative or a portable build, set `VIDEO_DOWNLOADER_BROWSER` to its executable path. Linux AppImages with a recognized browser name are detected automatically when executable and stored in `~/Applications`, `~/.local/bin`, or `~/Downloads`.
 
 1. **URL Pattern Matching** — fires before each request and checks for `.m3u8`, `.mpd`, HLS query parameters (`format=m3u8`, `type=hls`, etc.), and common path segments (`/hls/`, `/dash/`, `/manifest`).
 
 2. **Content-Type Sniffing** — fires when response headers arrive and checks the `Content-Type` for `application/x-mpegURL`, `application/vnd.apple.mpegurl`, or `application/dash+xml`. This catches streams served from URLs with no file extension.
+
+Captured request headers (including `Referer`) are forwarded to the downloader so streams protected by hotlink checks have the same request context as the browser.
 
 Captured URLs are sent via HTTP POST to the app on `localhost:8765`, then queued for download.
 
@@ -129,7 +164,7 @@ Captured URLs are sent via HTTP POST to the app on `localhost:8765`, then queued
 ## Requirements
 
 - **OS:** Windows 10+, macOS 12+, or Linux (x64/ARM)
-- **Browser:** Google Chrome, Chromium, Brave, Microsoft Edge, or Mozilla Firefox (for Hunting mode)
+- **Browser:** A Chromium-based browser such as Helium, Google Chrome, Chromium, Brave, Microsoft Edge, Vivaldi, Opera, or Thorium (for Hunting mode)
 - **Internet:** Required on first launch only if the bundled JRE is missing (auto-downloaded from Adoptium)
 
 ---
@@ -204,20 +239,38 @@ git push origin -f v1.0.6
 
 ## Troubleshooting
 
+The main window shows short, user-friendly status messages. Click **Show details** only when you need the technical output. You can copy it for a bug report or open the persistent log folder from there. Logs are stored at `~/.VideoDownloaderApp/logs/` and rotate automatically (2 MB per file, up to three backups), so diagnostics cannot grow without limit.
+
 **The extension tab doesn't close / nothing gets captured**
 - Make sure the app is running before you open the capture browser.
 - Check that port 8765 is not blocked by a firewall.
 - Some sites use DRM (Widevine) — encrypted streams cannot be downloaded.
 
 **Download fails with an error**
-- Update yt-dlp: delete `yt-dlp.exe` (or `yt-dlp`) from the app folder and restart — it will auto-download the latest version.
+- In a development checkout, run `cd electron && npm run tools:sync` to restore the pinned, checksum-verified engine tools.
+- In a portable release, restart the app to let its dependency check restore a missing yt-dlp binary.
 - Some sites require cookies. Open the site normally in browser (logged in), then use Hunting mode.
 
 **Browser says the extension is invalid**
 - Delete `~/.VideoDownloaderApp/Extension/` and restart the app to regenerate it.
 
 **yt-dlp warns "No supported JavaScript runtime could be found"**
-- YouTube now requires a JavaScript runtime for full format extraction. Install [Deno](https://deno.land):
-  - Windows: `winget install DenoLand.Deno`
-  - macOS/Linux: `curl -fsSL https://deno.land/install.sh | sh`
-- Downloads still work without it, but some YouTube formats may be missing.
+- Deno is now bundled in releases and synchronized for development from
+  `tools-manifest.json`. Run `npm run tools:sync` inside `electron/` if an old
+  checkout still shows this warning.
+
+---
+
+## Engine dependency automation
+
+`tools-manifest.json` is the single source of truth for yt-dlp, FFmpeg, and
+Deno versions, target filenames, download URLs, and SHA-256 hashes.
+
+- `npm run tools:update` refreshes the small manifest and downloads only the
+  binaries for the current machine. The large binaries remain Git-ignored.
+- `.github/workflows/release.yml` downloads every platform binary into its
+  temporary runner workspace from the same manifest; no binary is committed.
+- `.github/workflows/dependency-check.yml` rejects mismatched app versions or
+  Java/JRE versions before a forgotten `pom.xml` update reaches a release tag.
+- `.github/workflows/ci.yml` builds Java and Electron in clean containers on
+  pushes and pull requests.

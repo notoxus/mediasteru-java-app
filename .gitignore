@@ -19,6 +19,8 @@ tools/ffmpeg*
 tools/ffprobe*
 tools/yt-dlp*
 tools/yt-dlp
+tools/deno*
+tools/.tool-state.json
 # IDE ignore
 .idea/
 *.iml

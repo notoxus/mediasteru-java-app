@@ -3,6 +3,7 @@ package com.videodownloader.view;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Desktop;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
@@ -11,19 +12,21 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import java.io.File;
 import java.net.URL;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListSelectionModel;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -35,6 +38,7 @@ import javax.swing.JTextField;
 import javax.swing.RowFilter;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -42,21 +46,25 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 
+import com.videodownloader.controller.AppLogger;
 import com.videodownloader.controller.BrowserController;
 import com.videodownloader.controller.DownloadManager;
 import com.videodownloader.controller.UpdateChecker;
-import com.videodownloader.model.BrowserEngine;
 
 public class AppGUI extends JFrame {
 	private static final long serialVersionUID = 1L;
 	private JTextField urlInput;
 	private JButton btnClipboard, btnHunt, btnImportApi;
-	private JComboBox<BrowserEngine> cbBrowserEngine;
 	private DefaultTableModel tableModel;
 	private JTable queueTable;
 	private TableRowSorter<DefaultTableModel> sorter;
 	private JTextField searchField;
 	private JTextArea consoleLog;
+	private JPanel consolePanel;
+	private JLabel statusDot, statusLabel;
+	private JButton btnToggleDetails;
+	private Timer statusResetTimer;
+	private Consumer<String> diagnosticLogListener;
 	private JButton btnDownloadSelected, btnClearAll;
 
 	private final DownloadManager manager;
@@ -66,6 +74,7 @@ public class AppGUI extends JFrame {
 
 	public AppGUI(DownloadManager manager) {
 		this.manager = manager;
+		AppLogger.install();
 
 		setTitle("Video Downloader - " + UpdateChecker.getCurrentVersion());
 		try {
@@ -93,26 +102,16 @@ public class AppGUI extends JFrame {
 		inputPanel.add(urlInput, BorderLayout.CENTER);
 
 		JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-		btnImportApi = new JButton("Import API JSON");
+		btnImportApi = new JButton("Import List");
 		btnImportApi.setToolTipText("Import a JSON episode list for bulk downloads");
-		btnClipboard = new JButton("From Clipboard");
+		btnClipboard = new JButton("Paste Link");
 		btnClipboard.setToolTipText("Parse video URLs from clipboard content");
-
-		cbBrowserEngine = new JComboBox<>(BrowserEngine.values());
-		cbBrowserEngine.setSelectedItem(BrowserController.getEngine());
-		cbBrowserEngine.setToolTipText("Hunting Mode Browser Engine (Auto / Chromium / Mozilla Firefox)");
-		cbBrowserEngine.addActionListener(e -> {
-			BrowserEngine selected = (BrowserEngine) cbBrowserEngine.getSelectedItem();
-			BrowserController.setEngine(selected);
-			logToConsole("=> [Hunter] Browser engine set to: " + selected.getDisplayName());
-		});
 
 		btnHunt = new JButton("Hunt / Download");
 		btnHunt.setToolTipText("Detect stream URL via browser extension, or download directly");
 		btnHunt.putClientProperty("JButton.buttonType", "roundRect");
 		btnPanel.add(btnImportApi);
 		btnPanel.add(btnClipboard);
-		btnPanel.add(cbBrowserEngine);
 		btnPanel.add(btnHunt);
 
 		topPanel.add(inputPanel, BorderLayout.CENTER);
@@ -313,18 +312,37 @@ public class AppGUI extends JFrame {
 		JPanel bottomContainer = new JPanel(new BorderLayout(5, 5));
 		bottomContainer.setBorder(BorderFactory.createEmptyBorder(0, 12, 12, 12));
 
-		JPanel consolePanel = new JPanel(new BorderLayout());
-		consolePanel.setBorder(BorderFactory.createTitledBorder("Console Log"));
+		consolePanel = new JPanel(new BorderLayout(0, 4));
+		consolePanel.setBorder(BorderFactory.createTitledBorder("Technical details"));
 		consoleLog = new JTextArea(7, 50);
 		consoleLog.setEditable(false);
 		consoleLog.setBackground(new Color(28, 28, 28));
-		consoleLog.setForeground(new Color(180, 210, 180));
+		consoleLog.setForeground(new Color(190, 205, 190));
 		consoleLog.setFont(new Font("Monospaced", Font.PLAIN, 12));
 		consoleLog.setMargin(new Insets(4, 6, 4, 6));
 		consolePanel.add(new JScrollPane(consoleLog), BorderLayout.CENTER);
 
+		JButton btnCopyDetails = new JButton("Copy details");
+		JButton btnOpenLogs = new JButton("Open log folder");
+		JPanel detailActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+		detailActions.add(btnCopyDetails);
+		detailActions.add(btnOpenLogs);
+		consolePanel.add(detailActions, BorderLayout.SOUTH);
+		consolePanel.setVisible(false);
+
 		JPanel actionPanel = new JPanel(new BorderLayout(0, 5));
-		btnDownloadSelected = new JButton("Download Selected");
+		JPanel statusPanel = new JPanel(new BorderLayout(8, 0));
+		statusPanel.setBorder(BorderFactory.createEmptyBorder(3, 4, 3, 0));
+		statusDot = new JLabel("●");
+		statusLabel = new JLabel("Ready");
+		btnToggleDetails = new JButton("Show details");
+		btnToggleDetails.setToolTipText("Show technical logs for troubleshooting");
+		statusPanel.add(statusDot, BorderLayout.WEST);
+		statusPanel.add(statusLabel, BorderLayout.CENTER);
+		statusPanel.add(btnToggleDetails, BorderLayout.EAST);
+		setStatusAppearance(NoticeType.INFO);
+
+		btnDownloadSelected = new JButton("Start Selected");
 		btnDownloadSelected.setToolTipText("Start downloading all selected items in the queue");
 		btnDownloadSelected.putClientProperty("JButton.buttonType", "roundRect");
 
@@ -335,10 +353,25 @@ public class AppGUI extends JFrame {
 		JPanel actionButtons = new JPanel(new GridLayout(1, 2, 8, 0));
 		actionButtons.add(btnClearAll);
 		actionButtons.add(btnDownloadSelected);
-		actionPanel.add(actionButtons, BorderLayout.NORTH);
+		actionPanel.add(statusPanel, BorderLayout.CENTER);
+		actionPanel.add(actionButtons, BorderLayout.SOUTH);
 
 		bottomContainer.add(consolePanel, BorderLayout.CENTER);
 		bottomContainer.add(actionPanel, BorderLayout.SOUTH);
+
+		consoleLog.setText(AppLogger.getRecentText());
+		diagnosticLogListener = this::appendDiagnosticLine;
+		AppLogger.addListener(diagnosticLogListener);
+
+		btnToggleDetails.addActionListener(e -> {
+			boolean show = !consolePanel.isVisible();
+			consolePanel.setVisible(show);
+			btnToggleDetails.setText(show ? "Hide details" : "Show details");
+			bottomContainer.revalidate();
+			bottomContainer.repaint();
+		});
+		btnCopyDetails.addActionListener(e -> copyDiagnosticDetails());
+		btnOpenLogs.addActionListener(e -> openLogFolder());
 
 		add(topPanel, BorderLayout.NORTH);
 		add(queuePanel, BorderLayout.CENTER);
@@ -358,7 +391,7 @@ public class AppGUI extends JFrame {
 		btnDownloadSelected.addActionListener(e -> {
 			int[] selectedRows = queueTable.getSelectedRows();
 			if (selectedRows.length == 0) {
-				JOptionPane.showMessageDialog(this, "Please choose at least one URL to download!", "Not chose file yet",
+				JOptionPane.showMessageDialog(this, "Select at least one item to download.", "Nothing selected",
 						JOptionPane.WARNING_MESSAGE);
 				return;
 			}
@@ -409,7 +442,7 @@ public class AppGUI extends JFrame {
 			jsonArea.setLineWrap(true);
 			JScrollPane scrollPane = new JScrollPane(jsonArea);
 
-			int result = JOptionPane.showConfirmDialog(this, scrollPane, "Paste your API JSON here:",
+			int result = JOptionPane.showConfirmDialog(this, scrollPane, "Import video list",
 					JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
 			if (result == JOptionPane.OK_OPTION) {
@@ -453,10 +486,9 @@ public class AppGUI extends JFrame {
 	private void startHunting() {
 		String movieUrl = urlInput.getText().trim();
 		String lowerUrl = movieUrl.toLowerCase();
-		BrowserEngine engine = BrowserController.resolveActiveEngine();
 
 		if (movieUrl.isEmpty()) {
-			logToConsole("=> [Hunter] Launching " + engine.getDisplayName() + " for manual browsing...");
+			logToConsole("=> [Hunter] Opening the capture browser for manual browsing...");
 			BrowserController.openCaptureBrowser("");
 			return;
 		}
@@ -466,7 +498,7 @@ public class AppGUI extends JFrame {
 			logToConsole("=> [System] Detected native platform. Direct download...");
 			manager.processLink(movieUrl);
 		} else {
-			logToConsole("=> [Hunter] Launching " + engine.getDisplayName() + " Engine...");
+			logToConsole("=> [Hunter] Opening the capture browser...");
 			BrowserController.openCaptureBrowser(movieUrl);
 		}
 
@@ -474,10 +506,150 @@ public class AppGUI extends JFrame {
 	}
 
 	public void logToConsole(String message) {
+		System.out.println(message);
+		showNotice(toUserFacingMessage(message), inferNoticeType(message));
+	}
+
+	private void appendDiagnosticLine(String line) {
 		SwingUtilities.invokeLater(() -> {
-			consoleLog.append(message + "\n");
+			consoleLog.append(line + "\n");
+			int excess = consoleLog.getDocument().getLength() - 100_000;
+			if (excess > 0) {
+				try {
+					consoleLog.getDocument().remove(0, excess);
+				} catch (javax.swing.text.BadLocationException ignored) {
+				}
+			}
 			consoleLog.setCaretPosition(consoleLog.getDocument().getLength());
 		});
+	}
+
+	private void showNotice(String message, NoticeType type) {
+		if (!SwingUtilities.isEventDispatchThread()) {
+			SwingUtilities.invokeLater(() -> showNotice(message, type));
+			return;
+		}
+		statusLabel.setText(message == null || message.isBlank() ? "Ready" : message);
+		setStatusAppearance(type);
+		if (type == NoticeType.ERROR && !consolePanel.isVisible()) {
+			btnToggleDetails.setText("View error details");
+		}
+		if (statusResetTimer != null) {
+			statusResetTimer.stop();
+		}
+		statusResetTimer = new Timer(type == NoticeType.ERROR ? 10_000 : 6_000, e -> {
+			statusLabel.setText("Ready");
+			setStatusAppearance(NoticeType.INFO);
+			btnToggleDetails.setText(consolePanel.isVisible() ? "Hide details" : "Show details");
+		});
+		statusResetTimer.setRepeats(false);
+		statusResetTimer.start();
+	}
+
+	private void setStatusAppearance(NoticeType type) {
+		Color color = switch (type) {
+		case SUCCESS -> new Color(86, 190, 112);
+		case WARNING -> new Color(232, 176, 72);
+		case ERROR -> new Color(225, 92, 92);
+		case INFO -> new Color(105, 165, 225);
+		};
+		statusDot.setForeground(color);
+		statusLabel.setForeground(color);
+	}
+
+	private static NoticeType inferNoticeType(String message) {
+		String lower = message == null ? "" : message.toLowerCase();
+		if (lower.contains("error") || lower.contains("failed") || lower.contains("cannot")) {
+			return NoticeType.ERROR;
+		}
+		if (lower.contains("completed") || lower.contains("success")) {
+			return NoticeType.SUCCESS;
+		}
+		if (lower.contains("warning") || lower.contains("no valid") || lower.contains("canceled")
+				|| lower.contains("skip")) {
+			return NoticeType.WARNING;
+		}
+		return NoticeType.INFO;
+	}
+
+	private static String toUserFacingMessage(String message) {
+		String value = message == null ? "" : message.trim();
+		String lower = value.toLowerCase();
+		if (lower.contains("download completed")) {
+			return "Download completed. The file is ready.";
+		}
+		if (lower.contains("download failed") || lower.contains("queue error")) {
+			return "The download could not be completed. Open Details for more information.";
+		}
+		if (lower.contains("added captured link")) {
+			return "Captured video added to the queue.";
+		}
+		if (lower.contains("handling link")) {
+			return "Preparing the selected download...";
+		}
+		if (lower.contains("detected native platform")) {
+			return "Analyzing the link...";
+		}
+		if (lower.contains("opening the capture browser") || lower.contains("launching")) {
+			return "Opening the capture browser...";
+		}
+		if (lower.contains("parsing api json")) {
+			return "Reading the imported video list...";
+		}
+		if (lower.contains("manual catch")) {
+			return "A video link was found in the clipboard.";
+		}
+		if (lower.contains("no valid link")) {
+			return "The clipboard does not contain a supported link.";
+		}
+
+		String cleaned = value.replaceFirst("^\\s*(?:=>|>>)?\\s*", "");
+		while (cleaned.matches("^\\[[^]]+]\\s*.*")) {
+			cleaned = cleaned.replaceFirst("^\\[[^]]+]\\s*", "");
+		}
+		if (cleaned.length() > 160) {
+			cleaned = cleaned.substring(0, 157) + "...";
+		}
+		return cleaned.isBlank() ? "Ready" : cleaned;
+	}
+
+	private void copyDiagnosticDetails() {
+		String details = consoleLog.getText();
+		if (details.isBlank()) {
+			showNotice("There are no technical details to copy.", NoticeType.WARNING);
+			return;
+		}
+		try {
+			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(details), null);
+			showNotice("Technical details copied to the clipboard.", NoticeType.SUCCESS);
+		} catch (Exception e) {
+			System.err.println("[UI] Could not copy technical details: " + e.getMessage());
+			showNotice("Could not copy the technical details.", NoticeType.ERROR);
+		}
+	}
+
+	private void openLogFolder() {
+		File logFile = AppLogger.getLogFile();
+		try {
+			if (!Desktop.isDesktopSupported() || logFile.getParentFile() == null) {
+				throw new IllegalStateException("Opening folders is not supported on this system");
+			}
+			Desktop.getDesktop().open(logFile.getParentFile());
+			showNotice("Log folder opened.", NoticeType.SUCCESS);
+		} catch (Exception e) {
+			System.err.println("[UI] Could not open log folder " + logFile.getParent() + ": " + e.getMessage());
+			showNotice("Could not open the folder. Log: " + logFile.getAbsolutePath(), NoticeType.ERROR);
+		}
+	}
+
+	@Override
+	public void dispose() {
+		AppLogger.removeListener(diagnosticLogListener);
+		super.dispose();
+	}
+
+	private enum NoticeType {
+		INFO, SUCCESS, WARNING, ERROR
 	}
 
 	public int addQueueItem(String url, String format, String status) {

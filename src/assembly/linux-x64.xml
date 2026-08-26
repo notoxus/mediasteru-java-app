@@ -8,14 +8,19 @@
             <outputDirectory>/</outputDirectory>
             <destName>VideoDownloader.jar</destName>
         </file>
+        <file>
+            <source>${project.basedir}/tools-manifest.json</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
     </files>
     <fileSets>
         <fileSet>
             <directory>${project.basedir}/tools</directory>
             <outputDirectory>/</outputDirectory>
             <includes>
-                <include>yt-dlp</include>
+                <include>yt-dlp-linux-x64</include>
                 <include>ffmpeg-linux-x64</include>
+                <include>deno-linux-x64</include>
                 <include>run.sh</include>
             </includes>
             <fileMode>0755</fileMode>

@@ -1,0 +1,30 @@
+name: Dependency and version check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  project-versions:
+    name: Check app version and JRE alignment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Verify project versions and Java runtime
+        run: node scripts/check-project-versions.mjs
+
+      - name: Set up the declared Java runtime
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verify Maven can compile with the declared JRE
+        run: mvn package -DskipDistributionAssembly=true --no-transfer-progress

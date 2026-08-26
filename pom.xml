@@ -63,6 +63,7 @@
 							<goal>single</goal>
 						</goals>
 						<configuration>
+							<skipAssembly>${skipDistributionAssembly}</skipAssembly>
 							<finalName>VideoDownloader-v1.0.6</finalName>
 							<appendAssemblyId>true</appendAssemblyId>
 							<descriptors>
@@ -87,6 +88,7 @@
 							<goal>copy-resources</goal>
 						</goals>
 						<configuration>
+							<skip>${skipDistributionAssembly}</skip>
 							<outputDirectory>${project.build.directory}</outputDirectory>
 							<resources>
 								<resource>

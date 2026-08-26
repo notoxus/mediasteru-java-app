@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  java:
+    name: Java build in container
+    runs-on: ubuntu-latest
+    container: maven:3.9.11-eclipse-temurin-21
+    steps:
+      - uses: actions/checkout@v5
+      - run: mvn package -DskipDistributionAssembly=true --no-transfer-progress
+
+  electron:
+    name: Electron typecheck in container
+    runs-on: ubuntu-latest
+    container: node:22-bookworm-slim
+    defaults:
+      run:
+        working-directory: electron
+    steps:
+      - uses: actions/checkout@v5
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build

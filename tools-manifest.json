@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-25T16:07:17.818Z",
+  "tools": {
+    "yt-dlp": {
+      "repository": "yt-dlp/yt-dlp",
+      "version": "2026.08.19",
+      "tag": "2026.08.19",
+      "targets": {
+        "win32-x64": {
+          "asset": "yt-dlp.exe",
+          "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe",
+          "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a",
+          "binarySha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a",
+          "output": "yt-dlp.exe"
+        },
+        "darwin-x64": {
+          "asset": "yt-dlp_macos",
+          "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_macos",
+          "sha256": "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202",
+          "binarySha256": "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202",
+          "output": "yt-dlp-macos"
+        },
+        "darwin-arm64": {
+          "asset": "yt-dlp_macos",
+          "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_macos",
+          "sha256": "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202",
+          "binarySha256": "0f192b7ec147ab6288885d6351d9ab67367640029b4377576ef46dd79cf7b202",
+          "output": "yt-dlp-macos"
+        },
+        "linux-x64": {
+          "asset": "yt-dlp_linux",
+          "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_linux",
+          "sha256": "58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a",
+          "binarySha256": "58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a",
+          "output": "yt-dlp-linux-x64"
+        },
+        "linux-arm64": {
+          "asset": "yt-dlp_linux_aarch64",
+          "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_linux_aarch64",
+          "sha256": "b16e4dab368a816cd05d477d698a605a6ae87ccee1c8ffd38fa21d7254141fcc",
+          "binarySha256": "b16e4dab368a816cd05d477d698a605a6ae87ccee1c8ffd38fa21d7254141fcc",
+          "output": "yt-dlp-linux-arm64"
+        }
+      }
+    },
+    "ffmpeg": {
+      "repository": "Tyrrrz/FFmpegBin",
+      "version": "8.1.2",
+      "tag": "8.1.2",
+      "targets": {
+        "win32-x64": {
+          "asset": "ffmpeg-windows-x64.zip",
+          "url": "https://github.com/Tyrrrz/FFmpegBin/releases/download/8.1.2/ffmpeg-windows-x64.zip",
+          "sha256": "a00eea67c2145c9e340452c3db69de9b4b2e2a12693897a47d3525e953332a5e",
+          "binarySha256": "8c6ace4986372f4526dc4e735284547645704a189afb2fa367cdb68f80dd2eb6",
+          "archive": "zip",
+          "archiveEntry": "ffmpeg.exe",
+          "output": "ffmpeg-win-x64.exe"
+        },
+        "darwin-x64": {
+          "asset": "ffmpeg-osx-x64.zip",
+          "url": "https://github.com/Tyrrrz/FFmpegBin/releases/download/8.1.2/ffmpeg-osx-x64.zip",
+          "sha256": "c43651c396bf24edd0b3c99cf89783fd9d3fd44b8118c51995e51eb7e4ab8896",
+          "binarySha256": "2f429898d673c30dd2ba86c8088c2cc8b56d2e459e903642525d2e3100af111d",
+          "archive": "zip",
+          "archiveEntry": "ffmpeg",
+          "output": "ffmpeg-macos-x64"
+        },
+        "darwin-arm64": {
+          "asset": "ffmpeg-osx-arm64.zip",
+          "url": "https://github.com/Tyrrrz/FFmpegBin/releases/download/8.1.2/ffmpeg-osx-arm64.zip",
+          "sha256": "5bb06240aa9194849fed462b58d3c835e4ef7498c1d5f0f62fcaf59935747b4f",
+          "binarySha256": "fce8f6397bc9c83e29f97102a1087103ee82931299a23d903ef5282436461480",
+          "archive": "zip",
+          "archiveEntry": "ffmpeg",
+          "output": "ffmpeg-macos-arm64"
+        },
+        "linux-x64": {
+          "asset": "ffmpeg-linux-x64.zip",
+          "url": "https://github.com/Tyrrrz/FFmpegBin/releases/download/8.1.2/ffmpeg-linux-x64.zip",
+          "sha256": "66d14e6fdd3ca71e26e674afced0b3a44e63d4d892fcbec1cbce3b2a6d5032b8",
+          "binarySha256": "bdc821acb43f721ba4de30b8b3af456f2eda1744a572b39a1ea6cb075ca23570",
+          "archive": "zip",
+          "archiveEntry": "ffmpeg",
+          "output": "ffmpeg-linux-x64"
+        },
+        "linux-arm64": {
+          "asset": "ffmpeg-linux-arm64.zip",
+          "url": "https://github.com/Tyrrrz/FFmpegBin/releases/download/8.1.2/ffmpeg-linux-arm64.zip",
+          "sha256": "acceaf328440388b321ef79b07663496a9b2607a412c2ce1704d32a8f83defce",
+          "binarySha256": "ec32eedc187c135ef4731f1339939e6bc3bc6d203796946df9ba8db538102e17",
+          "archive": "zip",
+          "archiveEntry": "ffmpeg",
+          "output": "ffmpeg-linux-arm64"
+        }
+      }
+    },
+    "deno": {
+      "repository": "denoland/deno",
+      "version": "2.9.5",
+      "tag": "v2.9.5",
+      "targets": {
+        "win32-x64": {
+          "asset": "deno-x86_64-pc-windows-msvc.zip",
+          "url": "https://github.com/denoland/deno/releases/download/v2.9.5/deno-x86_64-pc-windows-msvc.zip",
+          "sha256": "171efab55ac6b9881fd53ee4c20f8bf3bb1340ffc618483746909014db12216a",
+          "binarySha256": "98f8c2a2d470e4ccb04c935c86ff8050817d877762aec5eaeeb9e409ccb3b9fd",
+          "archive": "zip",
+          "archiveEntry": "deno.exe",
+          "output": "deno-win-x64.exe"
+        },
+        "darwin-x64": {
+          "asset": "deno-x86_64-apple-darwin.zip",
+          "url": "https://github.com/denoland/deno/releases/download/v2.9.5/deno-x86_64-apple-darwin.zip",
+          "sha256": "c1b8b89a81e91b2a8b3f96def3195d08cfe3a105651da7908d53061f7140510d",
+          "binarySha256": "befc4fee79127584c0f5c9f76ca6bb73c8e6ff523c01acd52e9c5db1968a09cb",
+          "archive": "zip",
+          "archiveEntry": "deno",
+          "output": "deno-macos-x64"
+        },
+        "darwin-arm64": {
+          "asset": "deno-aarch64-apple-darwin.zip",
+          "url": "https://github.com/denoland/deno/releases/download/v2.9.5/deno-aarch64-apple-darwin.zip",
+          "sha256": "b796aadd131f6930560c1ee040cf0d6f53933fbb987464e9ff46bd7ea4830615",
+          "binarySha256": "b5bd08edab254d42d7b05aa5b6cb4c9b8d4dede4975aff76951ce2cce18866fa",
+          "archive": "zip",
+          "archiveEntry": "deno",
+          "output": "deno-macos-arm64"
+        },
+        "linux-x64": {
+          "asset": "deno-x86_64-unknown-linux-gnu.zip",
+          "url": "https://github.com/denoland/deno/releases/download/v2.9.5/deno-x86_64-unknown-linux-gnu.zip",
+          "sha256": "8b010a3b1a4a0188a67cdb8a7a27348b2a501af78aec7fc74f2ace167368d530",
+          "binarySha256": "dc480c462c8c3582524f3e75c160613d0a975e1f66b5465995d58bae236da7d3",
+          "archive": "zip",
+          "archiveEntry": "deno",
+          "output": "deno-linux-x64"
+        },
+        "linux-arm64": {
+          "asset": "deno-aarch64-unknown-linux-gnu.zip",
+          "url": "https://github.com/denoland/deno/releases/download/v2.9.5/deno-aarch64-unknown-linux-gnu.zip",
+          "sha256": "6b7cae3a8fc4385a59dea3146fcb8bad7fea4230e0ad36a8c692afacbc254be0",
+          "binarySha256": "e1a70c5eb03b0ebaf761077029ef86b9ba22d50e2b54ca45ce5437457f701b63",
+          "archive": "zip",
+          "archiveEntry": "deno",
+          "output": "deno-linux-arm64"
+        }
+      }
+    }
+  }
+}

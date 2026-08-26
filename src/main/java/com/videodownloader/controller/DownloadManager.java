@@ -93,7 +93,7 @@ public class DownloadManager implements Observer {
 				System.out.println("Remaining: " + remaining + " video.");
 				if (strategy != null) {
 					strategy.startDownload(task.url, task.savePath, task.format, task.trimSection, task.preciseCut,
-							this);
+							this, task.referer, task.requestHeaders);
 				}
 
 			} catch (InterruptedException e) {
@@ -151,12 +151,20 @@ public class DownloadManager implements Observer {
 		System.err.println("\n>> Error: failed to download. Details: " + errorMessage);
 
 		if (gui != null && currentRowIndex != -1) {
-			gui.updateQueueItemStatus(currentRowIndex, "Error", "0%");
+			gui.updateQueueItemStatus(currentRowIndex, "Failed", "—");
 			gui.logToConsole(">> Download failed: " + errorMessage);
 		}
 	}
 
 	public void processAutoCapture(String url) {
+		processAutoCapture(url, null, Map.of());
+	}
+
+	public void processAutoCapture(String url, String referer) {
+		processAutoCapture(url, referer, Map.of());
+	}
+
+	public void processAutoCapture(String url, String referer, Map<String, String> requestHeaders) {
 		Toolkit.getDefaultToolkit().beep();
 
 		DownloadOptionsDialog.Options opts = DownloadOptionsDialog
@@ -171,7 +179,9 @@ public class DownloadManager implements Observer {
 					if (gui != null) {
 						String formatLabel = opts.format.toUpperCase();
 						int newRow = gui.addQueueItem(url, formatLabel, "Waiting...");
-						pendingTasks.put(newRow, new DownloadTask(url, savePath, opts.format, null, false, newRow));
+						pendingTasks.put(newRow,
+								new DownloadTask(url, savePath, opts.format, null, false, newRow, referer,
+										requestHeaders));
 						gui.logToConsole(
 								"=> [Hunter] Added captured link to list (Row " + newRow + "). Ready to download.");
 						resolveTitleAsync(url, newRow);
@@ -329,15 +339,29 @@ public class DownloadManager implements Observer {
 		String trimSection; // null = full video
 		boolean preciseCut;
 		int rowIndex;
+		String referer;
+		Map<String, String> requestHeaders;
 
 		public DownloadTask(String url, String savePath, String format, String trimSection, boolean preciseCut,
 				int rowIndex) {
+			this(url, savePath, format, trimSection, preciseCut, rowIndex, null);
+		}
+
+		public DownloadTask(String url, String savePath, String format, String trimSection, boolean preciseCut,
+				int rowIndex, String referer) {
+			this(url, savePath, format, trimSection, preciseCut, rowIndex, referer, Map.of());
+		}
+
+		public DownloadTask(String url, String savePath, String format, String trimSection, boolean preciseCut,
+				int rowIndex, String referer, Map<String, String> requestHeaders) {
 			this.url = url;
 			this.savePath = savePath;
 			this.format = format;
 			this.trimSection = trimSection;
 			this.preciseCut = preciseCut;
 			this.rowIndex = rowIndex;
+			this.referer = referer;
+			this.requestHeaders = requestHeaders == null ? Map.of() : Map.copyOf(requestHeaders);
 		}
 	}
 }

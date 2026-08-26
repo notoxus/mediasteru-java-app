@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'" />
+    <title>Video Downloader</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand">
+          <img src="logo.png" alt="" />
+          <div><h1>Video Downloader</h1><p>Download videos and captured streams</p></div>
+        </div>
+      </header>
+
+      <section class="control-card">
+        <label for="url-input">Video or page URL</label>
+        <div class="url-row">
+          <input id="url-input" type="url" spellcheck="false" placeholder="https://…" />
+          <button id="paste-button" class="button secondary">Paste</button>
+          <button id="download-button" class="button secondary">Download URL</button>
+          <button id="hunt-button" class="button primary">Open Hunter</button>
+        </div>
+        <div class="option-row">
+          <div class="folder-control">
+            <label for="folder-input">Output folder</label>
+            <div class="field-button">
+              <input id="folder-input" readonly placeholder="Choose where files will be saved" />
+              <button id="folder-button" class="button subtle">Browse</button>
+            </div>
+          </div>
+          <div class="format-control">
+            <label for="format-select">Format</label>
+            <select id="format-select">
+              <option value="mp4">MP4</option>
+              <option value="mkv">MKV</option>
+              <option value="mp3">MP3</option>
+            </select>
+          </div>
+          <div class="quality-control">
+            <label for="quality-select">Quality</label>
+            <select id="quality-select">
+              <option value="720">720p</option>
+              <option value="1080" selected>1080p</option>
+              <option value="1440">1440p</option>
+              <option value="2160">2160p</option>
+              <option value="best">Best</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="queue-card">
+        <div class="section-heading"><div><h2>Download queue</h2><p>Captured streams start automatically</p></div></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Name / Link</th><th>Format</th><th>Status</th><th>Progress</th><th></th></tr></thead>
+            <tbody id="queue-body"></tbody>
+          </table>
+          <div id="empty-state" class="empty-state">
+            <div class="empty-icon">↓</div>
+            <h3>No downloads yet</h3>
+            <p>Paste a direct link or open Hunter and play a video.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="status-bar">
+        <div class="status-message"><span id="status-dot" class="status-dot info"></span><span id="status-text">Ready</span></div>
+        <button id="error-log-button" class="text-button" hidden>Open error log</button>
+      </footer>
+    </main>
+    <script src="renderer.js"></script>
+  </body>
+</html>

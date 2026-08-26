@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+
+import { spawnSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const scriptDirectory = dirname(fileURLToPath(import.meta.url));
+for (const script of ['update-tools-manifest.mjs', 'sync-tools.mjs']) {
+  const result = spawnSync(process.execPath, [join(scriptDirectory, script)], {
+    stdio: 'inherit',
+    windowsHide: true,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}

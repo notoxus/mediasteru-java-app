@@ -6,6 +6,7 @@
 # Updates:
 #   - pom.xml                                (version -> 1.0.x, assembly finalName -> VideoDownloader-v1.0.x)
 #   - src/main/resources/version.properties  (version -> 1.0.x)
+#   - electron/package*.json                  (version -> 1.0.x)
 #   - UpdateChecker.java                     (DEFAULT_FALLBACK_VERSION -> "v1.0.x")
 #   - Installation.md                        (all VideoDownloader-v*-<platform> filenames)
 #   - README.md                              (version badge / info)
@@ -48,6 +49,13 @@ sed -i -E "1,15s/(<version>)[^<]+(<\/version>)/\1$NEW\2/" pom.xml
 
 if [ -f src/main/resources/version.properties ]; then
     echo "version=$NEW" > src/main/resources/version.properties
+fi
+
+if [ -f electron/package.json ]; then
+    sed -i -E "1,15s/(\"version\": \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1$NEW\2/" electron/package.json
+fi
+if [ -f electron/package-lock.json ]; then
+    sed -i -E "1,15s/(\"version\": \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1$NEW\2/" electron/package-lock.json
 fi
 
 if grep -q "DEFAULT_FALLBACK_VERSION" src/main/java/com/videodownloader/controller/UpdateChecker.java 2>/dev/null; then

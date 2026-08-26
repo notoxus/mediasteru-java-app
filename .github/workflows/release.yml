@@ -20,9 +20,17 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Set up Node.js for consistency checks
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
       - name: Extract version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Verify tag, project version, and JRE alignment
+        run: node scripts/check-project-versions.mjs --expected=${GITHUB_REF_NAME#v}
 
       - name: Sync version to tag
         run: |
@@ -32,7 +40,7 @@ jobs:
           echo "version=${VERSION}" > src/main/resources/version.properties
 
       - name: Build fat JAR (skip assembly packages)
-        run: mvn package -DskipAssembly=true --no-transfer-progress
+        run: mvn package -DskipDistributionAssembly=true --no-transfer-progress
 
       - name: Upload fat JAR
         uses: actions/upload-artifact@v5
@@ -380,40 +388,25 @@ jobs:
           name: jre-linux-arm
           path: tools/jre-linux-arm/
 
-      - name: Download engine tools (yt-dlp & ffmpeg) for release packages
-        run: |
-          # 1. Download yt-dlp binaries
-          curl -sSL -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o tools/yt-dlp.exe
-          curl -sSL -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos -o tools/yt-dlp-macos
-          curl -sSL -f https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o tools/yt-dlp
+      - name: Set up Node.js for dependency synchronization
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
 
-          # 2. Download ffmpeg binaries
-          curl -sSL -f https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v4.4.1/ffmpeg-4.4.1-win-64.zip -o ffmpeg-win.zip
-          unzip -q ffmpeg-win.zip -d tools/ && rm ffmpeg-win.zip
+      - name: Restore engine tool cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            tools/yt-dlp*
+            tools/ffmpeg*
+            tools/deno*
+          key: engine-tools-${{ hashFiles('tools-manifest.json') }}
 
-          curl -sSL -f https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v4.4.1/ffmpeg-4.4.1-osx-64.zip -o ffmpeg-mac.zip
-          unzip -q ffmpeg-mac.zip -d tmp-mac && mv tmp-mac/ffmpeg tools/ffmpeg-macos && rm -rf tmp-mac ffmpeg-mac.zip
+      - name: Synchronize checksum-verified engine tools
+        run: node scripts/sync-tools.mjs --all
 
-          curl -sSL -f https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v4.4.1/ffmpeg-4.4.1-linux-64.zip -o ffmpeg-linux64.zip
-          unzip -q ffmpeg-linux64.zip -d tmp-l64 && mv tmp-l64/ffmpeg tools/ffmpeg-linux-x64 && rm -rf tmp-l64 ffmpeg-linux64.zip
-
-          curl -sSL -f https://github.com/ffbinaries/ffbinaries-prebuilt/releases/download/v4.4.1/ffmpeg-4.4.1-linux-arm-64.zip -o ffmpeg-linuxarm.zip
-          unzip -q ffmpeg-linuxarm.zip -d tmp-larm && mv tmp-larm/ffmpeg tools/ffmpeg-linux-arm64 && rm -rf tmp-larm ffmpeg-linuxarm.zip
-
-          chmod +x tools/ffmpeg* tools/yt-dlp* tools/*.exe || true
-          # 3. Download Deno binaries
-          curl -sSL -f https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip -o deno-win.zip
-          unzip -q deno-win.zip -d tools/ && rm deno-win.zip
-          
-          curl -sSL -f https://github.com/denoland/deno/releases/latest/download/deno-x86_64-apple-darwin.zip -o deno-mac.zip
-          unzip -q deno-mac.zip -d tmp-deno-mac && mv tmp-deno-mac/deno tools/deno-macos && rm -rf tmp-deno-mac deno-mac.zip
-          
-          curl -sSL -f https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip -o deno-linux64.zip
-          unzip -q deno-linux64.zip -d tmp-deno-l64 && mv tmp-deno-l64/deno tools/deno-linux-x64 && rm -rf tmp-deno-l64 deno-linux64.zip
-          
-          curl -sSL -f https://github.com/denoland/deno/releases/latest/download/deno-aarch64-unknown-linux-gnu.zip -o deno-linuxarm.zip
-          unzip -q deno-linuxarm.zip -d tmp-deno-larm && mv tmp-deno-larm/deno tools/deno-linux-arm64 && rm -rf tmp-deno-larm deno-linuxarm.zip
-          chmod +x tools/deno* || true
+      - name: Verify synchronized engine tools
+        run: node scripts/sync-tools.mjs --all --check
       - name: Download Android APKs
         if: needs.build-android.result == 'success'
         uses: actions/download-artifact@v5

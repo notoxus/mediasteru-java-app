@@ -7,9 +7,12 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -135,11 +138,22 @@ public class LocalHttpServer {
 				try {
 					JsonObject json = JsonParser.parseString(body).getAsJsonObject();
 					String streamUrl = json.get("url").getAsString();
+					String referer = json.has("referer") && !json.get("referer").isJsonNull()
+							? json.get("referer").getAsString()
+							: null;
+					Map<String, String> requestHeaders = new LinkedHashMap<>();
+					if (json.has("headers") && json.get("headers").isJsonObject()) {
+						for (Map.Entry<String, JsonElement> entry : json.getAsJsonObject("headers").entrySet()) {
+							if (entry.getValue() != null && !entry.getValue().isJsonNull()) {
+								requestHeaders.put(entry.getKey(), entry.getValue().getAsString());
+							}
+						}
+					}
 
 					System.out.println("\n[Extension] Captured URL: " + streamUrl);
 					respondJson(ex, 200, "{\"status\":\"ok\"}");
 
-					manager.processAutoCapture(streamUrl);
+					manager.processAutoCapture(streamUrl, referer, requestHeaders);
 
 				} catch (Exception e) {
 					System.err.println("[Error] Failed to process request: " + e.getMessage());

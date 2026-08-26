@@ -1,0 +1,23 @@
+{
+  "name": "video-downloader-electron",
+  "version": "1.0.6",
+  "private": true,
+  "description": "Wayland-native desktop prototype for Video Downloader",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
+    "start": "npm run tools:sync && npm run build && electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "tools:sync": "node ../scripts/sync-tools.mjs",
+    "tools:check": "node ../scripts/sync-tools.mjs --check",
+    "tools:update": "node ../scripts/update-local-tools.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "electron": "^41.0.0",
+    "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "electron@41.10.7": true
+  }
+}
