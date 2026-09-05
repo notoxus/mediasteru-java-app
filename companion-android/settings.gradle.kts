@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "VideoDownloaderCompanion"
+rootProject.name = "MediaSteruCompanion"
 include(":app")

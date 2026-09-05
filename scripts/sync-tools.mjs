@@ -43,7 +43,7 @@ async function exists(file) {
 async function download(url, destination) {
   const response = await fetch(url, {
     redirect: 'follow',
-    headers: { 'User-Agent': 'VideoDownloader dependency synchronizer' },
+    headers: { 'User-Agent': 'MediaSteru dependency synchronizer' },
   });
   if (!response.ok || !response.body) {
     throw new Error(`Download failed (${response.status}): ${url}`);

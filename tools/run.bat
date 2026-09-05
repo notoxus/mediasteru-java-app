@@ -3,7 +3,7 @@ setlocal EnableDelayedExpansion
 
 set "JRE_DIR=%~dp0jre"
 set "JAVA_EXE=%JRE_DIR%\bin\javaw.exe"
-set "JAR=%~dp0VideoDownloader.jar"
+set "JAR=%~dp0MediaSteru.jar"
 
 :: JREs checker
 if exist "%JAVA_EXE%" goto :launch

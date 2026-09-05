@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Send to PC</string>
-    <string name="setup_title">Video Downloader Companion</string>
-    <string name="setup_hint">Enter your PC\'s Wi-Fi IP address. You can find it in the desktop app\'s console log (line starting with [Companion]).</string>
+    <string name="setup_title">MediaSteru Companion</string>
+    <string name="setup_hint">Enter your PC\'s Wi-Fi IP address. On Linux, run hostname -I; on Windows, run ipconfig.</string>
     <string name="save_and_test">Save &amp; Test connection</string>
     <string name="enter_ip_first">Please enter the PC\'s IP address first</string>
     <string name="testing">Testing connection…</string>
     <string name="test_ok">✅ Connected! Now share any video link to \"Send to PC\".</string>
-    <string name="test_fail">❌ Could not reach the PC. Check: same Wi-Fi, desktop app running, firewall allows Java.</string>
+    <string name="test_fail">❌ Could not reach the PC. Check: same Wi-Fi, desktop app running, firewall allows MediaSteru.</string>
     <string name="no_link_found">No link found in the shared text</string>
     <string name="setup_first">Set the PC\'s IP address first</string>
     <string name="sending">Sending to PC…</string>
-    <string name="sent_ok">✅ Sent! Check your PC to choose the format.</string>
+    <string name="sent_ok">✅ Sent! Check the download queue on your PC.</string>
     <string name="sent_fail">❌ Failed to send. Is the desktop app running on the same Wi-Fi?</string>
 </resources>

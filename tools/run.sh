@@ -31,7 +31,7 @@ fi
 
 JRE_DIR="$SCRIPT_DIR/jre-$PLATFORM"
 JAVA_BIN="$JRE_DIR/bin/java"
-JAR="$SCRIPT_DIR/VideoDownloader.jar"
+JAR="$SCRIPT_DIR/MediaSteru.jar"
 
 # Download JRES
 download_jre() {

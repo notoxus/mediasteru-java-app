@@ -1,0 +1,20 @@
+services:
+  mediasteru:
+    image: "${MEDIASTERU_IMAGE:-ghcr.io/notoxus/mediasteru:latest}"
+    build:
+      context: .
+    container_name: mediasteru
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${MEDIASTERU_HOST_PORT:-8765}:8765"
+    environment:
+      MEDIASTERU_CONTROL_TOKEN: "${MEDIASTERU_CONTROL_TOKEN:-}"
+      MEDIASTERU_DEFAULT_FORMAT: "${MEDIASTERU_DEFAULT_FORMAT:-mp4}"
+      MEDIASTERU_DEFAULT_QUALITY: "${MEDIASTERU_DEFAULT_QUALITY:-1080}"
+    volumes:
+      - mediasteru-data:/data
+      - ./downloads:/downloads
+
+volumes:
+  mediasteru-data:

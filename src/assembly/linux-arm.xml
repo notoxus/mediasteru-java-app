@@ -6,7 +6,7 @@
         <file>
             <source>${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar</source>
             <outputDirectory>/</outputDirectory>
-            <destName>VideoDownloader.jar</destName>
+            <destName>MediaSteru.jar</destName>
         </file>
         <file>
             <source>${project.basedir}/tools-manifest.json</source>

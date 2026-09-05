@@ -1,12 +1,14 @@
 {
-  "name": "video-downloader-electron",
+  "name": "mediasteru-electron",
   "version": "1.0.6",
   "private": true,
-  "description": "Wayland-native desktop prototype for Video Downloader",
+  "description": "Modern Wayland-native desktop client for MediaSteru",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
+    "test": "npm run build && node --test dist/tests/*.test.js",
     "start": "npm run tools:sync && npm run build && electron .",
+    "daemon": "npm run tools:sync && npm run build && node dist/daemon.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "tools:sync": "node ../scripts/sync-tools.mjs",
     "tools:check": "node ../scripts/sync-tools.mjs --check",
@@ -19,5 +21,6 @@
   },
   "allowScripts": {
     "electron@41.10.7": true
-  }
+  },
+  "productName": "MediaSteru"
 }

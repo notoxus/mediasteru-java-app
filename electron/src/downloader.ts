@@ -24,7 +24,7 @@ export class Downloader {
   ) {}
 
   toolStatus(): ToolStatus {
-    return this.discoverTools();
+    return { ...this.discoverTools(), mpv: null };
   }
 
   start(request: DownloadRequest): void {
@@ -54,27 +54,30 @@ export class Downloader {
       const tools = this.resolveTools(true)!;
       this.emit({ id: request.id, type: 'started', message: 'Preparing download…' });
       const result = await this.runYtDlp(request, tools);
+      let outputPath = result.outputPath;
       if (this.canceled.has(request.id)) {
         this.emit({ id: request.id, type: 'canceled', message: 'Download canceled.' });
         return;
       }
       if (result.exitCode !== 0) {
-        const fallbackWorked = Boolean(request.referer)
+        const fallbackOutput = Boolean(request.referer)
           && await this.tryDirectFfmpeg(request, tools);
-        if (!fallbackWorked) {
+        if (!fallbackOutput) {
           throw new Error(result.lastError || `yt-dlp exited with code ${result.exitCode}`);
         }
+        outputPath = fallbackOutput;
       } else if (request.format === 'mp4') {
-        if (!result.outputPath) {
+        if (!outputPath) {
           throw new Error('Could not locate the downloaded MKV file.');
         }
-        await this.convertToMp4(request, tools, result.outputPath);
+        outputPath = await this.convertToMp4(request, tools, outputPath);
       }
       if (this.canceled.has(request.id)) {
         this.emit({ id: request.id, type: 'canceled', message: 'Download canceled.' });
         return;
       }
-      this.emit({ id: request.id, type: 'complete', savedPath: request.savePath });
+      if (!outputPath) throw new Error('Could not determine the downloaded file path.');
+      this.emit({ id: request.id, type: 'complete', savedPath: request.savePath, outputPath });
       this.log('INFO', `Download completed: ${request.url}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -104,6 +107,8 @@ export class Downloader {
       '--extractor-args', 'generic:impersonate',
       '--ffmpeg-location', tools.ffmpeg,
       '--concurrent-fragments', '16',
+      '--http-chunk-size', '10M',
+      '--throttled-rate', '100K',
       '--fragment-retries', '10',
       '--retry-sleep', '3',
       '--add-header', `Referer: ${request.referer || request.url}`,
@@ -118,11 +123,11 @@ export class Downloader {
         '-f', this.videoFormatSelector(request.quality),
         '--merge-output-format', 'mkv',
         '--remux-video', 'mkv',
-        '--print', 'after_move:filepath',
       );
     } else {
       args.push('-f', this.videoFormatSelector(request.quality), '--remux-video', 'mkv');
     }
+    args.push('--print', 'after_move:__VD_FILE__%(filepath)s');
     args.push('-o', join(request.savePath, '%(title)s.%(ext)s'), request.url);
 
     return new Promise((resolvePromise) => {
@@ -161,8 +166,9 @@ export class Downloader {
             percent: Number(standardProgress[1]),
             speed: standardProgress[2] || 'N/A',
           });
-        } else if (request.format === 'mp4' && existsSync(clean) && extname(clean).toLowerCase() === '.mkv') {
-          outputPath = resolve(clean);
+        } else if (clean.startsWith('__VD_FILE__')) {
+          const printedPath = clean.slice('__VD_FILE__'.length).trim();
+          if (printedPath) outputPath = resolve(printedPath);
         } else if (/error|failed|forbidden/i.test(clean)) {
           lastError = clean;
           this.emit({ id: request.id, type: 'log', message: clean });
@@ -194,7 +200,7 @@ export class Downloader {
     });
   }
 
-  private async tryDirectFfmpeg(request: DownloadRequest, tools: ToolPaths): Promise<boolean> {
+  private async tryDirectFfmpeg(request: DownloadRequest, tools: ToolPaths): Promise<string | null> {
     this.emit({ id: request.id, type: 'log', message: 'Trying the captured stream directly with FFmpeg…' });
     const extension = request.format === 'mp3' ? '.mp3' : '.mkv';
     const output = join(request.savePath, `captured-${Date.now()}${extension}`);
@@ -209,16 +215,17 @@ export class Downloader {
     const exitCode = await this.runFfmpeg(request.id, tools.ffmpeg, args);
     if (exitCode !== 0 || !existsSync(output)) {
       if (existsSync(output)) rmSync(output, { force: true });
-      return false;
+      return null;
     }
     if (request.format === 'mp4') {
-      await this.convertToMp4(request, tools, output);
+      return this.convertToMp4(request, tools, output);
     }
-    return true;
+    return output;
   }
 
-  private async convertToMp4(request: DownloadRequest, tools: ToolPaths, source: string): Promise<void> {
+  private async convertToMp4(request: DownloadRequest, tools: ToolPaths, source: string): Promise<string> {
     const target = join(dirname(source), `${basename(source, extname(source))}.mp4`);
+    this.emit({ id: request.id, type: 'processing', message: 'Converting to MP4…' });
     this.emit({ id: request.id, type: 'log', message: 'Converting MKV to MP4 without re-encoding…' });
     let exitCode = await this.runFfmpeg(request.id, tools.ffmpeg, [
       '-y', '-i', source, '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', '-movflags', '+faststart', target,
@@ -237,6 +244,7 @@ export class Downloader {
       throw new Error('FFmpeg could not create the MP4 file.');
     }
     rmSync(source, { force: true });
+    return target;
   }
 
   private runFfmpeg(id: string, executable: string, args: string[]): Promise<number> {
@@ -305,7 +313,7 @@ export class Downloader {
     return null;
   }
 
-  private discoverTools(): ToolStatus {
+  private discoverTools(): Omit<ToolStatus, 'mpv'> {
     const names = this.toolNames();
     const roots = [join(this.projectRoot, 'tools'), this.resourcesPath, join(this.resourcesPath, 'tools')];
     const ytDlp = this.findTool(roots, names.ytDlp) ?? this.findOnPath(names.ytDlpFallback);

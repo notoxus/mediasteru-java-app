@@ -4,11 +4,12 @@
 # If no version is specified, it automatically increments the patch version from the latest git tag.
 #
 # Updates:
-#   - pom.xml                                (version -> 1.0.x, assembly finalName -> VideoDownloader-v1.0.x)
+#   - pom.xml                                (version -> 1.0.x, assembly finalName -> MediaSteru-v1.0.x)
 #   - src/main/resources/version.properties  (version -> 1.0.x)
 #   - electron/package*.json                  (version -> 1.0.x)
+#   - cli/Cargo.toml + Cargo.lock             (version -> 1.0.x)
 #   - UpdateChecker.java                     (DEFAULT_FALLBACK_VERSION -> "v1.0.x")
-#   - Installation.md                        (all VideoDownloader-v*-<platform> filenames)
+#   - Installation.md                        (all MediaSteru-v*-<platform> filenames)
 #   - README.md                              (version badge / info)
 #   - companion-android/app/build.gradle.kts (versionName + versionCode+1)
 
@@ -44,7 +45,7 @@ fi
 echo "Bumping to v$NEW ..."
 
 # --- Desktop ---
-sed -i -E "s/(<finalName>VideoDownloader-v)[0-9]+\.[0-9]+\.[0-9]+(<\/finalName>)/\1$NEW\2/" pom.xml
+sed -i -E "s/(<finalName>MediaSteru-v)[0-9]+\.[0-9]+\.[0-9]+(<\/finalName>)/\1$NEW\2/" pom.xml
 sed -i -E "1,15s/(<version>)[^<]+(<\/version>)/\1$NEW\2/" pom.xml
 
 if [ -f src/main/resources/version.properties ]; then
@@ -58,12 +59,21 @@ if [ -f electron/package-lock.json ]; then
     sed -i -E "1,15s/(\"version\": \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1$NEW\2/" electron/package-lock.json
 fi
 
-if grep -q "DEFAULT_FALLBACK_VERSION" src/main/java/com/videodownloader/controller/UpdateChecker.java 2>/dev/null; then
-    sed -i -E "s/(DEFAULT_FALLBACK_VERSION = \")v[0-9]+\.[0-9]+\.[0-9]+(\")/\1v$NEW\2/" \
-        src/main/java/com/videodownloader/controller/UpdateChecker.java
+if [ -f cli/Cargo.toml ]; then
+    sed -i -E "1,10s/(version = \")[0-9]+\.[0-9]+\.[0-9]+(\")/\1$NEW\2/" cli/Cargo.toml
+    if command -v cargo >/dev/null 2>&1; then
+        cargo update --manifest-path cli/Cargo.toml -p mediasteru-cli --precise "$NEW"
+    else
+        echo "Warning: cargo not found; regenerate cli/Cargo.lock before releasing."
+    fi
 fi
 
-sed -i -E "s/VideoDownloader-v[0-9]+\.[0-9]+\.[0-9]+/VideoDownloader-v$NEW/g" Installation.md
+if grep -q "DEFAULT_FALLBACK_VERSION" src/main/java/com/mediasteru/controller/UpdateChecker.java 2>/dev/null; then
+    sed -i -E "s/(DEFAULT_FALLBACK_VERSION = \")v[0-9]+\.[0-9]+\.[0-9]+(\")/\1v$NEW\2/" \
+        src/main/java/com/mediasteru/controller/UpdateChecker.java
+fi
+
+sed -i -E "s/MediaSteru-v[0-9]+\.[0-9]+\.[0-9]+/MediaSteru-v$NEW/g" Installation.md
 
 sed -i -E "s/(<!-- VERSION_START -->)[^<]+(<!-- VERSION_END -->)/\1$NEW\2/g" README.md
 

@@ -25,3 +25,18 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+
+  cli:
+    name: Rust CLI and TUI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+      - run: cargo test --locked
+      - run: cargo build --release --locked

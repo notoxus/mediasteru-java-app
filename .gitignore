@@ -1,4 +1,5 @@
 target/
+cli/target/
 
 # Android release signing — never commit the keystore or its passwords
 # (README.md inside keystore/ is intentionally kept — see the negation below)
@@ -24,3 +25,4 @@ tools/.tool-state.json
 # IDE ignore
 .idea/
 *.iml
+.settings/

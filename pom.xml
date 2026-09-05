@@ -4,7 +4,7 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.myname</groupId>
-	<artifactId>VideoDownloaderApp</artifactId>
+	<artifactId>MediaSteru</artifactId>
 	<version>1.0.6</version>
 	<properties>
 		<maven.compiler.source>21</maven.compiler.source>
@@ -45,7 +45,7 @@
 						<configuration>
 							<archive>
 								<manifest>
-									<mainClass>com.videodownloader.Program</mainClass>
+									<mainClass>com.mediasteru.Program</mainClass>
 									<addDefaultImplementationEntries>true</addDefaultImplementationEntries>
 									<addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
 								</manifest>
@@ -64,7 +64,7 @@
 						</goals>
 						<configuration>
 							<skipAssembly>${skipDistributionAssembly}</skipAssembly>
-							<finalName>VideoDownloader-v1.0.6</finalName>
+							<finalName>MediaSteru-v1.0.6</finalName>
 							<appendAssemblyId>true</appendAssemblyId>
 							<descriptors>
 								<descriptor>src/assembly/win.xml</descriptor>

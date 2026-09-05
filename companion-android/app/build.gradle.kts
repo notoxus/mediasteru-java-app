@@ -12,11 +12,11 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "com.videodownloader.companion"
+    namespace = "com.mediasteru.companion"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.videodownloader.companion"
+        applicationId = "com.mediasteru.companion"
         minSdk = 26
         targetSdk = 36
         versionCode = 7

@@ -1,14 +1,14 @@
-# Video Downloader
+# MediaSteru
 
-![Downloads](https://img.shields.io/github/downloads/notoxus/video-downloader/total)
+![Downloads](https://img.shields.io/github/downloads/notoxus/mediasteru/total)
 
 [How to install the App](Installation.md)
 
-A desktop app for capturing and downloading HLS/DASH video streams, with built-in support for YouTube, TikTok, Facebook, Instagram, and many more.
+A local-first media downloader with a portable Swing release, a modern Electron/Wayland client in development, and a lightweight Rust terminal client.
 
 ---
 
-## Quick Start
+## Quick Start — Portable Desktop Release
 
 ### Windows
 Extract the archive and double-click **`run.bat`**.
@@ -54,6 +54,54 @@ See [`electron/README.md`](electron/README.md) for implemented features and the 
 
 ---
 
+## Rust CLI / TUI
+
+The terminal client follows the rmpc-style separation between a lightweight keyboard-first view and a single media core. It controls the running Electron app through a versioned localhost API, so it does not start a second downloader or write to the SQLite library independently.
+
+```bash
+# Build once
+cargo build --release --manifest-path cli/Cargo.toml
+
+# Start the Electron host, then use another terminal
+./cli/target/release/mediasteru status
+./cli/target/release/mediasteru get "https://example.com/video" --format mp4 --quality 1080
+./cli/target/release/mediasteru library "tutorial"
+./cli/target/release/mediasteru tui
+```
+
+Running `mediasteru` without a subcommand also opens the TUI. Its main keys are `1`/`2` for Downloads/Library, `a` or `d` to add a URL, `j`/`k` to move, `c` to cancel, `r` to retry, `p` to play through mpv, and `q` to quit.
+
+The control API accepts localhost connections only. Optionally set the same `MEDIASTERU_CONTROL_TOKEN` environment variable for both Electron and the CLI to require a bearer token. See [`cli/README.md`](cli/README.md) for every command.
+
+---
+
+## Docker / Podman — Headless CLI Edition
+
+Following [BentoPDF's self-hosted Docker pattern](https://www.bentopdf.com/docs/self-hosting/docker), MediaSteru provides a small Compose file with a persistent service, healthcheck, restart policy, and mounted data. This edition runs the shared media core without Electron; use the bundled CLI/TUI from your terminal.
+
+```bash
+docker pull ghcr.io/notoxus/mediasteru:latest
+docker compose up -d
+```
+
+The CLI is already included in the image, so no host installation or shell alias is required:
+
+```bash
+docker exec mediasteru mediasteru status
+docker exec mediasteru mediasteru get "https://example.com/video" --quality 1080
+docker exec -it mediasteru mediasteru # opens the TUI
+```
+
+`docker exec mediasteru ...` runs the bundled CLI inside the already-running `mediasteru` container; it does not install, copy, or build another application on the host. The optional `-it` only attaches an interactive terminal, which the full-screen TUI needs. This keeps the setup independent of Bash, Zsh, Fish, PowerShell, and the desktop environment.
+
+Downloaded files appear in `./downloads`; SQLite data and bounded logs use the `mediasteru-data` volume. Port `8765` remains available for the Android companion. Because the container is headless, browser-window Hunting and host mpv playback remain desktop-client features.
+
+The Compose file pulls `ghcr.io/notoxus/mediasteru:latest` and can also build from the local Dockerfile. Published images support Linux AMD64 and ARM64.
+
+If port `8765` is already occupied, start with `MEDIASTERU_HOST_PORT=9876 docker compose up -d`. The service still listens on `8765` inside the container, so the bundled CLI needs no extra configuration.
+
+---
+
 ## Features
 
 | Feature | Description |
@@ -69,10 +117,12 @@ See [`electron/README.md`](electron/README.md) for implemented features and the 
 | **Auto-Update (engine)** | yt-dlp self-updates in the background on every launch, so site extractors stay fresh |
 | **Auto-Update (app)** | On launch the app checks GitHub for a newer release and can download the ready-to-use package for your exact OS/architecture |
 | **Trim Before Download** | Cut a specific section (e.g. 01:30 → 02:45) and download only that clip — no full download needed |
+| **Local Library (Electron)** | Completed media is indexed in SQLite and can be searched, revealed, copied, or played through mpv |
+| **CLI / TUI (Electron host)** | Control the same queue and library from a small Rust terminal client |
 
 ---
 
-## How to Download a Video
+## How to Download — Portable Swing Client
 
 ### Method 1 — Direct URL (YouTube, TikTok, etc.)
 
@@ -145,11 +195,11 @@ Select one or more rows and click **Start Selected** to start them.
 
 ---
 
-## How Hunting Works (Technical)
+## How Swing Hunting Works (Technical)
 
-The app generates a Chromium extension at `~/.VideoDownloaderApp/Extension/chromium/` and loads it into a disposable browser profile under the system temporary directory. The extension hooks into the browser's `webRequest` API with two interception layers:
+The app generates a Chromium extension at `~/.MediaSteru/Extension/chromium/` and loads it into a disposable browser profile under the system temporary directory. The extension hooks into the browser's `webRequest` API with two interception layers:
 
-The launcher recognizes common Chromium-family browsers on Windows, macOS, and Linux, including Helium. For an uncommon derivative or a portable build, set `VIDEO_DOWNLOADER_BROWSER` to its executable path. Linux AppImages with a recognized browser name are detected automatically when executable and stored in `~/Applications`, `~/.local/bin`, or `~/Downloads`.
+The launcher recognizes common Chromium-family browsers on Windows, macOS, and Linux, including Helium. For an uncommon derivative or a portable build, set `MEDIASTERU_BROWSER` to its executable path. Linux AppImages with a recognized browser name are detected automatically when executable and stored in `~/Applications`, `~/.local/bin`, or `~/Downloads`.
 
 1. **URL Pattern Matching** — fires before each request and checks for `.m3u8`, `.mpd`, HLS query parameters (`format=m3u8`, `type=hls`, etc.), and common path segments (`/hls/`, `/dash/`, `/manifest`).
 
@@ -164,14 +214,16 @@ Captured URLs are sent via HTTP POST to the app on `localhost:8765`, then queued
 ## Requirements
 
 - **OS:** Windows 10+, macOS 12+, or Linux (x64/ARM)
-- **Browser:** A Chromium-based browser such as Helium, Google Chrome, Chromium, Brave, Microsoft Edge, Vivaldi, Opera, or Thorium (for Hunting mode)
-- **Internet:** Required on first launch only if the bundled JRE is missing (auto-downloaded from Adoptium)
+- **Browser (Swing Hunting):** A Chromium-based browser such as Helium, Google Chrome, Chromium, Brave, Microsoft Edge, Vivaldi, Opera, or Thorium. Electron Hunting uses its built-in Chromium window instead.
+- **Internet:** Required to resolve and download online media. The launcher also needs it once if the bundled JRE must be restored from Adoptium.
 
 ---
 
 ## Building from Source
 
-Requirements: Java 21, Maven 3.3+
+### Portable Swing client
+
+Requirements: Java 21 and Maven 3.3+.
 
 ```bash
 mvn clean package
@@ -180,6 +232,25 @@ mvn clean package
 Outputs are in `target/` — platform-specific archives for Windows, macOS (x64/ARM), and Linux (x64/ARM).
 
 > **Note:** The release archives bundle a trimmed JRE built automatically by CI (`jlink`). When building locally, the `tools/jre-*/` directories must be present for the assembly to include them. The launchers (`run.bat` / `run.sh`) will fall back to auto-downloading a JRE from Adoptium if the folder is missing.
+
+### Electron client
+
+Requirements: Node.js 22+ and npm.
+
+```bash
+cd electron
+npm install
+npm start
+```
+
+### Terminal client
+
+Requirements: Rust 1.88+ and Cargo. Electron must be running because it owns the shared media core.
+
+```bash
+cargo build --release --locked --manifest-path cli/Cargo.toml
+./cli/target/release/mediasteru tui
+```
 
 ---
 
@@ -239,7 +310,7 @@ git push origin -f v1.0.6
 
 ## Troubleshooting
 
-The main window shows short, user-friendly status messages. Click **Show details** only when you need the technical output. You can copy it for a bug report or open the persistent log folder from there. Logs are stored at `~/.VideoDownloaderApp/logs/` and rotate automatically (2 MB per file, up to three backups), so diagnostics cannot grow without limit.
+Both desktop clients show short, user-friendly status messages instead of a developer console. In Swing, click **Show details** when you need technical output. Electron only shows **Open error log** after an error. Swing logs live under `~/.MediaSteru/logs/`; Electron uses the operating system's standard application-data directory. Both log stores are bounded.
 
 **The extension tab doesn't close / nothing gets captured**
 - Make sure the app is running before you open the capture browser.
@@ -252,7 +323,7 @@ The main window shows short, user-friendly status messages. Click **Show details
 - Some sites require cookies. Open the site normally in browser (logged in), then use Hunting mode.
 
 **Browser says the extension is invalid**
-- Delete `~/.VideoDownloaderApp/Extension/` and restart the app to regenerate it.
+- Delete `~/.MediaSteru/Extension/` and restart the app to regenerate it.
 
 **yt-dlp warns "No supported JavaScript runtime could be found"**
 - Deno is now bundled in releases and synchronized for development from

@@ -1,6 +1,6 @@
 # 🚀 Installation Guide
 
-Welcome to the setup guide for **Video Downloader**! The application is **Plug & Play** — no Java installation required. Everything is self-contained.
+Welcome to the setup guide for the current **MediaSteru Swing desktop release**. It is **Plug & Play** — no system Java installation is required because the release archive is self-contained.
 
 ## Step 1: Requirements
 
@@ -10,24 +10,22 @@ Welcome to the setup guide for **Video Downloader**! The application is **Plug &
 
 ## Step 2: Installing the App
 
-1. Navigate to the **[Releases](../../releases)** page of this repository.
+1. Navigate to the **[Releases](https://github.com/notoxus/mediasteru/releases)** page of this repository.
 2. Download the archive that matches your Operating System:
-   * **Windows:** `VideoDownloader-v1.0.6-Win.zip`
+   * **Windows:** `MediaSteru-v1.0.6-Win.zip`
    * **macOS:**
-     * `VideoDownloader-v1.0.6-Mac-Intel.tar.gz` (Intel x64)
-     * `VideoDownloader-v1.0.6-Mac-AppleSilicon.tar.gz` (Apple Silicon ARM)
+     * `MediaSteru-v1.0.6-Mac-Intel.tar.gz` (Intel x64)
+     * `MediaSteru-v1.0.6-Mac-AppleSilicon.tar.gz` (Apple Silicon ARM)
    * **Linux:**
-     * `VideoDownloader-v1.0.6-Linux-x64.tar.gz` (x64)
-     * `VideoDownloader-v1.0.6-Linux-ARM.tar.gz` (ARM64)
-   * **Android:**
-     * `VideoDownloader-v1.0.6.apk` (standalone — hunts and downloads directly on the phone)
-     * `VideoDownloader-v1.0.6-remote-desktop.apk` (companion — sends links from phone to the desktop app)
+     * `MediaSteru-v1.0.6-Linux-x64.tar.gz` (x64)
+     * `MediaSteru-v1.0.6-Linux-ARM.tar.gz` (ARM64)
+   * **Android companion:** `MediaSteru-v1.0.6-remote-desktop.apk` — sends shared links from the phone to the desktop app. The workflow does not currently publish a standalone Android downloader.
 
 ## 📂 Package Structure (What's Inside)
 
 Once extracted, your installation folder contains:
 
-* **Core App:** `VideoDownloader.jar` — the main compiled application.
+* **Core App:** `MediaSteru.jar` — the main compiled application.
 * **Launcher Script:** `run.bat` (Windows) or `run.sh` (Mac/Linux) — starts the app.
 * **Embedded Runtime:** A trimmed JRE 21 tailored for your platform, built automatically by CI using `jlink`.
 * **Engine Tools:** checksum-verified `yt-dlp`, `ffmpeg`, and `deno` binaries
@@ -41,7 +39,7 @@ Once extracted, your installation folder contains:
 
 ### For Windows Users
 
-1. Extract `VideoDownloader-v1.0.6-Win.zip` to any folder.
+1. Extract `MediaSteru-v1.0.6-Win.zip` to any folder.
 2. **Double-click `run.bat`** to launch the app.
 
 > The launcher silently checks for the bundled JRE. If it's missing for any reason, it will download and install it automatically before launching.
@@ -66,9 +64,54 @@ Unix-based systems require explicit permission to execute launcher scripts.
 
 > Same as Windows — the launcher auto-detects your OS and architecture, checks for the bundled JRE, and downloads it from Adoptium if missing.
 
-### For Android Users
+#### Linux display scaling
 
-Install the `.apk` file and allow installation from unknown sources when prompted.
+The app uses a 175% interface scale on Linux because some Wayland compositors do not expose fractional DPI correctly to Swing. To override it, launch with a percentage or decimal value:
+
+```bash
+MEDIASTERU_UI_SCALE=150% ./run.sh
+# or use 1.0 to restore the unscaled size
+```
+
+### For Android Companion Users
+
+Install the `-remote-desktop.apk` file and allow installation from unknown sources when prompted. The phone and desktop must be on the same local network, and the desktop app must be running.
+
+## Electron Preview and Terminal Client
+
+The Electron/Wayland desktop client and Rust terminal client are currently developer builds rather than packaged release assets. Build and start Electron first, then run the terminal client in another terminal:
+
+```bash
+cd electron
+npm install
+npm start
+
+# In another terminal, from the repository root:
+cargo run --manifest-path cli/Cargo.toml -- tui
+```
+
+See [`electron/README.md`](electron/README.md) and [`cli/README.md`](cli/README.md) for details.
+
+## Docker / Podman Headless Installation
+
+The container edition runs MediaSteru as a background service and includes the terminal client. It does not require Java, Node.js, Rust, Electron, yt-dlp, FFmpeg, or Deno on the host.
+
+```bash
+git clone https://github.com/notoxus/mediasteru.git
+cd mediasteru
+mkdir -p downloads
+docker compose up -d
+alias mediasteru="$PWD/docker/mediasteru"
+
+mediasteru status
+mediasteru tui
+```
+
+Use `docker compose pull && docker compose up -d` to update. Files are written to `./downloads`, while the media library and logs persist in the `mediasteru-data` Docker volume.
+
+Set `MEDIASTERU_HOST_PORT=9876` before `docker compose up -d` when the default host port `8765` is already occupied. For a local image build, use `MEDIASTERU_IMAGE=mediasteru:local docker compose up -d --build`.
+
+The container is intended for direct downloads, CLI/TUI use, and Android Companion submissions. Use the Electron or Swing desktop client when you need an interactive Hunting browser; containerized mpv playback is not connected to the host desktop.
 
 ---
 

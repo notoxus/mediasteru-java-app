@@ -1,27 +1,15 @@
-// Keep this file as a browser script (no imports/exports). The preload bridge
-// supplies runtime APIs; importing even types here makes CommonJS emit an
-// `exports` marker, which is unavailable in a sandboxed renderer.
+// Browser-only presentation layer. All durable state and process orchestration
+// live in the main process; this file renders snapshots and forwards intent.
 type DownloadFormat = 'mp4' | 'mkv' | 'mp3';
 type DownloadQuality = '720' | '1080' | '1440' | '2160' | 'best';
-
-interface DownloadRequest {
-  id: string;
-  url: string;
-  savePath: string;
-  format: DownloadFormat;
-  quality: DownloadQuality;
-  referer?: string;
-  requestHeaders?: Record<string, string>;
-}
-
-interface DownloadEvent {
-  id: string;
-  type: 'started' | 'progress' | 'log' | 'complete' | 'error' | 'canceled';
-  percent?: number;
-  speed?: string;
-  message?: string;
-  savedPath?: string;
-}
+type DownloadTaskStatus =
+  | 'queued'
+  | 'preparing'
+  | 'downloading'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'canceled';
 
 interface CapturedMedia {
   url: string;
@@ -29,19 +17,41 @@ interface CapturedMedia {
   requestHeaders: Record<string, string>;
 }
 
-type TaskStatus = 'Waiting' | 'Preparing' | 'Downloading' | 'Converting' | 'Completed' | 'Failed' | 'Canceled';
-
-interface QueueTask extends DownloadRequest {
+interface DownloadTask {
+  id: string;
+  url: string;
+  savePath: string;
+  format: DownloadFormat;
+  quality: DownloadQuality;
+  referer?: string;
+  requestHeaders?: Record<string, string>;
   name: string;
-  status: TaskStatus;
+  status: DownloadTaskStatus;
   percent: number;
   speed: string;
   error?: string;
+  outputPath?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-const tasks = new Map<string, QueueTask>();
+interface LibraryItem {
+  id: number;
+  sourceUrl: string;
+  title: string;
+  localPath: string;
+  format: DownloadFormat;
+  resolution: string | null;
+  downloadedAt: string;
+  lastPlayedAt: string | null;
+  playbackPosition: number;
+}
+
+const tasks = new Map<string, DownloadTask>();
+let libraryItems: LibraryItem[] = [];
 let outputFolder = '';
 let hunting = false;
+let mpvAvailable = false;
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
@@ -59,6 +69,9 @@ const statusText = byId<HTMLSpanElement>('status-text');
 const statusDot = byId<HTMLSpanElement>('status-dot');
 const errorLogButton = byId<HTMLButtonElement>('error-log-button');
 const huntButton = byId<HTMLButtonElement>('hunt-button');
+const libraryList = byId<HTMLDivElement>('library-list');
+const libraryEmpty = byId<HTMLDivElement>('library-empty');
+const librarySearch = byId<HTMLInputElement>('library-search');
 
 function setStatus(message: string, kind: 'info' | 'success' | 'warning' | 'error' = 'info'): void {
   statusText.textContent = message;
@@ -76,20 +89,52 @@ function labelForUrl(value: string): string {
   }
 }
 
-function formatProgress(task: QueueTask): string {
-  if (task.status === 'Completed') return '100%';
-  if (task.status === 'Failed' || task.status === 'Canceled') return '—';
+function statusLabel(status: DownloadTaskStatus): string {
+  return {
+    queued: 'Queued',
+    preparing: 'Preparing',
+    downloading: 'Downloading',
+    processing: 'Processing',
+    completed: 'Done',
+    failed: 'Failed',
+    canceled: 'Canceled',
+  }[status];
+}
+
+function formatProgress(task: DownloadTask): string {
+  if (task.status === 'completed') return '100%';
+  if (task.status === 'failed' || task.status === 'canceled') return '—';
+  if (task.status === 'processing') return 'Finalizing';
   const percent = `${task.percent.toFixed(1)}%`;
   return task.speed && task.speed !== 'N/A' ? `${percent} · ${task.speed}` : percent;
+}
+
+function taskActions(task: DownloadTask): string {
+  if (task.status === 'completed' && task.outputPath) {
+    return `
+      <button class="row-action primary-action" data-action="play" data-id="${task.id}" ${mpvAvailable ? '' : 'disabled'} title="${mpvAvailable ? 'Play with mpv' : 'Install mpv to play'}">Play</button>
+      <button class="row-action" data-action="show" data-id="${task.id}" title="Show in folder">Folder</button>
+      <button class="row-action" data-action="copy" data-id="${task.id}" title="Copy file path">Copy</button>
+      <button class="icon-button" data-action="remove" data-id="${task.id}" title="Remove from queue">×</button>
+    `;
+  }
+  if (task.status === 'failed' || task.status === 'canceled') {
+    return `
+      <button class="row-action" data-action="retry" data-id="${task.id}">Retry</button>
+      <button class="icon-button" data-action="remove" data-id="${task.id}" title="Remove from queue">×</button>
+    `;
+  }
+  return `<button class="row-action danger-action" data-action="cancel" data-id="${task.id}">Cancel</button>`;
 }
 
 function renderQueue(): void {
   queueBody.replaceChildren();
   emptyState.hidden = tasks.size > 0;
+  byId<HTMLSpanElement>('download-count').textContent = String(tasks.size);
   let index = 1;
   for (const task of tasks.values()) {
     const row = document.createElement('tr');
-    const progressClass = task.status === 'Failed' ? ' failed' : '';
+    const progressClass = task.status === 'failed' ? ' failed' : '';
     row.innerHTML = `
       <td class="index-cell">${index}</td>
       <td class="media-cell">
@@ -97,23 +142,57 @@ function renderQueue(): void {
         <span class="media-url"></span>
       </td>
       <td><span class="format-chip">${task.format.toUpperCase()} · ${task.format === 'mp3' ? 'Audio' : task.quality === 'best' ? 'Best' : `${task.quality}p`}</span></td>
-      <td><span class="task-status status-${task.status.toLowerCase()}">${task.status}</span></td>
+      <td><span class="task-status status-${task.status}">${statusLabel(task.status)}</span></td>
       <td class="progress-cell">
         <div class="progress-track"><div class="progress-fill${progressClass}" style="width:${Math.max(0, Math.min(100, task.percent))}%"></div></div>
         <span>${formatProgress(task)}</span>
       </td>
-      <td class="action-cell"><button class="icon-button" data-cancel="${task.id}" title="Cancel or remove">×</button></td>
+      <td class="action-cell">${taskActions(task)}</td>
     `;
     row.querySelector<HTMLElement>('.media-name')!.textContent = task.name;
-    row.querySelector<HTMLElement>('.media-url')!.textContent = task.url;
+    row.querySelector<HTMLElement>('.media-url')!.textContent = task.error || task.url;
     queueBody.append(row);
     index += 1;
   }
 }
 
+function renderLibrary(): void {
+  const query = librarySearch.value.trim().toLocaleLowerCase();
+  const visible = libraryItems.filter((item) => !query
+    || item.title.toLocaleLowerCase().includes(query)
+    || item.localPath.toLocaleLowerCase().includes(query));
+  libraryList.replaceChildren();
+  libraryEmpty.hidden = visible.length > 0;
+  libraryEmpty.querySelector('h3')!.textContent = libraryItems.length > 0
+    ? 'No matching media'
+    : 'Your library is empty';
+  byId<HTMLSpanElement>('library-count').textContent = String(libraryItems.length);
+  for (const item of visible) {
+    const row = document.createElement('article');
+    row.className = 'library-item';
+    row.innerHTML = `
+      <div class="media-glyph">${item.format === 'mp3' ? '♪' : '▶'}</div>
+      <div class="library-meta">
+        <strong></strong>
+        <span></span>
+      </div>
+      <span class="format-chip">${item.format.toUpperCase()}${item.resolution ? ` · ${item.resolution}` : ''}</span>
+      <div class="library-actions">
+        <button class="button subtle" data-library-action="play" data-path="" ${mpvAvailable ? '' : 'disabled'}>Play</button>
+        <button class="button subtle" data-library-action="show" data-path="">Folder</button>
+        <button class="button subtle" data-library-action="copy" data-path="">Copy path</button>
+      </div>
+    `;
+    row.querySelector('strong')!.textContent = item.title;
+    row.querySelector('.library-meta span')!.textContent = item.localPath;
+    row.querySelectorAll<HTMLElement>('[data-path]').forEach((button) => { button.dataset.path = item.localPath; });
+    libraryList.append(row);
+  }
+}
+
 async function ensureOutputFolder(): Promise<string | null> {
   if (outputFolder) return outputFolder;
-  const selected = await window.videoDownloader.chooseFolder();
+  const selected = await window.mediaSteru.chooseFolder();
   if (!selected) {
     setStatus('Choose an output folder before starting a download.', 'warning');
     return null;
@@ -126,70 +205,57 @@ async function ensureOutputFolder(): Promise<string | null> {
 async function enqueue(url: string, capture?: CapturedMedia): Promise<void> {
   const savePath = await ensureOutputFolder();
   if (!savePath) return;
-  const id = crypto.randomUUID();
-  const task: QueueTask = {
-    id,
-    url,
-    savePath,
-    format: formatSelect.value as DownloadFormat,
-    quality: qualitySelect.value as DownloadQuality,
-    referer: capture?.referer,
-    requestHeaders: capture?.requestHeaders,
-    name: labelForUrl(url),
-    status: 'Waiting',
-    percent: 0,
-    speed: 'N/A',
-  };
-  tasks.set(id, task);
-  renderQueue();
-  setStatus('Download added to the queue.', 'info');
   try {
-    await window.videoDownloader.startDownload(task);
+    await window.mediaSteru.startDownload({
+      id: crypto.randomUUID(),
+      url,
+      savePath,
+      format: formatSelect.value as DownloadFormat,
+      quality: qualitySelect.value as DownloadQuality,
+      referer: capture?.referer,
+      requestHeaders: capture?.requestHeaders,
+      name: labelForUrl(url),
+    });
+    setStatus('Download added to the queue.', 'info');
   } catch (error) {
-    task.status = 'Failed';
-    task.error = error instanceof Error ? error.message : String(error);
-    renderQueue();
-    setStatus(task.error, 'error');
+    setStatus(error instanceof Error ? error.message : String(error), 'error');
   }
 }
 
-function handleDownloadEvent(event: DownloadEvent): void {
-  const task = tasks.get(event.id);
-  if (!task) return;
-  switch (event.type) {
-    case 'started':
-      task.status = 'Preparing';
-      setStatus('Preparing the download…');
-      break;
-    case 'progress':
-      task.status = 'Downloading';
-      task.percent = event.percent ?? task.percent;
-      task.speed = event.speed ?? task.speed;
-      setStatus(`Downloading ${task.name} — ${task.percent.toFixed(1)}%`);
-      break;
-    case 'log':
-      if (event.message?.toLowerCase().includes('convert')) task.status = 'Converting';
-      break;
-    case 'complete':
-      task.status = 'Completed';
-      task.percent = 100;
-      setStatus('Download completed. The file is ready.', 'success');
-      break;
-    case 'error':
-      task.status = 'Failed';
-      task.error = event.message;
-      setStatus(event.message || 'The download failed. Open details for more information.', 'error');
-      break;
-    case 'canceled':
-      task.status = 'Canceled';
-      setStatus('Download canceled.', 'warning');
-      break;
+function applyQueueSnapshot(snapshot: DownloadTask[]): void {
+  const completedNow = snapshot.find((task) => task.status === 'completed'
+    && tasks.get(task.id)?.status !== 'completed');
+  tasks.clear();
+  for (const task of snapshot) tasks.set(task.id, task);
+  const active = snapshot.find((task) => ['preparing', 'downloading', 'processing'].includes(task.status));
+  if (active) {
+    setStatus(`${statusLabel(active.status)} ${active.name}${active.status === 'downloading' ? ` — ${active.percent.toFixed(1)}%` : ''}`);
+  } else if (snapshot.some((task) => task.status === 'failed')) {
+    setStatus('One or more downloads failed. Check the row or open the error log.', 'error');
+  } else if (completedNow) {
+    setStatus(`${completedNow.name} downloaded successfully.`, 'success');
   }
   renderQueue();
+}
+
+async function runMediaAction(action: string, path: string): Promise<void> {
+  try {
+    if (action === 'play') {
+      await window.mediaSteru.playMedia(path);
+      setStatus('Opened in mpv.', 'success');
+    } else if (action === 'show') {
+      await window.mediaSteru.showMedia(path);
+    } else if (action === 'copy') {
+      await window.mediaSteru.writeClipboard(path);
+      setStatus('File path copied.', 'success');
+    }
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error), 'error');
+  }
 }
 
 byId<HTMLButtonElement>('folder-button').addEventListener('click', async () => {
-  const selected = await window.videoDownloader.chooseFolder();
+  const selected = await window.mediaSteru.chooseFolder();
   if (selected) {
     outputFolder = selected;
     folderInput.value = selected;
@@ -198,7 +264,7 @@ byId<HTMLButtonElement>('folder-button').addEventListener('click', async () => {
 });
 
 byId<HTMLButtonElement>('paste-button').addEventListener('click', async () => {
-  const text = (await window.videoDownloader.readClipboard()).trim();
+  const text = (await window.mediaSteru.readClipboard()).trim();
   const match = text.match(/https?:\/\/\S+/i);
   if (!match) {
     setStatus('The clipboard does not contain an HTTP link.', 'warning');
@@ -206,6 +272,27 @@ byId<HTMLButtonElement>('paste-button').addEventListener('click', async () => {
   }
   urlInput.value = match[0];
   setStatus('Link pasted from the clipboard.', 'success');
+});
+
+byId<HTMLButtonElement>('import-button').addEventListener('click', async () => {
+  const savePath = await ensureOutputFolder();
+  if (!savePath) return;
+  try {
+    const items = await window.mediaSteru.importList();
+    for (const item of items) {
+      await window.mediaSteru.startDownload({
+        id: crypto.randomUUID(),
+        url: item.url,
+        savePath,
+        format: formatSelect.value as DownloadFormat,
+        quality: qualitySelect.value as DownloadQuality,
+        name: item.name,
+      });
+    }
+    if (items.length > 0) setStatus(`${items.length} items added to the queue.`, 'success');
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : String(error), 'error');
+  }
 });
 
 byId<HTMLButtonElement>('download-button').addEventListener('click', async () => {
@@ -219,19 +306,25 @@ byId<HTMLButtonElement>('download-button').addEventListener('click', async () =>
   urlInput.value = '';
 });
 
+urlInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    byId<HTMLButtonElement>('download-button').click();
+  }
+});
+
 huntButton.addEventListener('click', async () => {
   if (hunting) {
     setStatus('The capture browser is already open.', 'warning');
     return;
   }
-  const savePath = await ensureOutputFolder();
-  if (!savePath) return;
+  if (!await ensureOutputFolder()) return;
   const target = urlInput.value.trim() || 'https://www.google.com';
   try {
     hunting = true;
     huntButton.disabled = true;
     huntButton.textContent = 'Hunter open';
-    await window.videoDownloader.openHunter(target);
+    await window.mediaSteru.openHunter(target);
     setStatus('Play a video in the capture window. The stream will be detected automatically.');
   } catch (error) {
     hunting = false;
@@ -246,41 +339,94 @@ formatSelect.addEventListener('change', () => {
   qualitySelect.disabled = audioOnly;
   qualitySelect.title = audioOnly ? 'Video quality does not apply to MP3 audio' : '';
 });
+librarySearch.addEventListener('input', renderLibrary);
+
+function activateView(view: 'downloads' | 'library'): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach((item) => {
+    const active = item.dataset.view === view;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-pressed', String(active));
+  });
+  byId('downloads-view').hidden = view !== 'downloads';
+  byId('library-view').hidden = view !== 'library';
+  if (view === 'library') librarySearch.focus();
+}
+
+document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach((button) => {
+  button.addEventListener('click', () => activateView(button.dataset.view as 'downloads' | 'library'));
+});
+
+document.addEventListener('keydown', (event) => {
+  const commandKey = event.ctrlKey || event.metaKey;
+  if (commandKey && event.key.toLocaleLowerCase() === 'l') {
+    event.preventDefault();
+    activateView('downloads');
+    urlInput.focus();
+    urlInput.select();
+  } else if (commandKey && event.key.toLocaleLowerCase() === 'o') {
+    event.preventDefault();
+    byId<HTMLButtonElement>('import-button').click();
+  } else if (commandKey && event.key === 'Enter') {
+    event.preventDefault();
+    byId<HTMLButtonElement>('download-button').click();
+  } else if (event.altKey && event.key === '1') {
+    event.preventDefault();
+    activateView('downloads');
+  } else if (event.altKey && event.key === '2') {
+    event.preventDefault();
+    activateView('library');
+  }
+});
 
 errorLogButton.addEventListener('click', async () => {
-  const error = await window.videoDownloader.openLogs();
+  const error = await window.mediaSteru.openLogs();
   setStatus(error ? `Could not open log folder: ${error}` : 'Log folder opened.', error ? 'error' : 'success');
 });
 
 queueBody.addEventListener('click', async (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-cancel]');
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action]');
   if (!button) return;
-  const id = button.dataset.cancel!;
-  const task = tasks.get(id);
+  const task = tasks.get(button.dataset.id ?? '');
   if (!task) return;
-  if (['Preparing', 'Downloading', 'Converting'].includes(task.status)) {
-    await window.videoDownloader.cancelDownload(id);
-  } else {
-    tasks.delete(id);
-    renderQueue();
-  }
+  const action = button.dataset.action;
+  if (action === 'cancel') await window.mediaSteru.cancelDownload(task.id);
+  else if (action === 'remove') await window.mediaSteru.removeDownload(task.id);
+  else if (action === 'retry') await window.mediaSteru.retryDownload(task.id);
+  else if (task.outputPath && action) await runMediaAction(action, task.outputPath);
 });
 
-window.videoDownloader.onCaptured((capture) => {
-  setStatus('Media stream captured. Starting download…', 'success');
+libraryList.addEventListener('click', async (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-library-action]');
+  const action = button?.dataset.libraryAction;
+  const path = button?.dataset.path;
+  if (action && path) await runMediaAction(action, path);
+});
+
+window.mediaSteru.onCaptured((capture) => {
+  setStatus('Media link received. Adding it to the queue…', 'success');
   void enqueue(capture.url, capture);
 });
-window.videoDownloader.onHunterClosed(() => {
+window.mediaSteru.onHunterClosed(() => {
   hunting = false;
   huntButton.disabled = false;
   huntButton.textContent = 'Open Hunter';
 });
-window.videoDownloader.onDownloadEvent(handleDownloadEvent);
+window.mediaSteru.onQueueChanged(applyQueueSnapshot);
+window.mediaSteru.onLibraryChanged((items) => {
+  libraryItems = items;
+  renderLibrary();
+});
 
-void window.videoDownloader.toolStatus().then((tools) => {
+void Promise.all([
+  window.mediaSteru.listDownloads(),
+  window.mediaSteru.listLibrary(),
+  window.mediaSteru.toolStatus(),
+]).then(([downloads, media, tools]) => {
+  mpvAvailable = Boolean(tools.mpv);
+  libraryItems = media;
+  applyQueueSnapshot(downloads);
+  renderLibrary();
   if (!tools.ytDlp || !tools.ffmpeg) {
     setStatus('A required download component is missing. Open the error log for details.', 'error');
   }
 });
-
-renderQueue();

@@ -4,71 +4,155 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'" />
-    <title>Video Downloader</title>
+    <title>MediaSteru</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="app-header">
         <div class="brand">
-          <img src="logo.png" alt="" />
-          <div><h1>Video Downloader</h1><p>Download videos and captured streams</p></div>
+          <div class="brand-mark"><img src="logo.png" alt="" /></div>
+          <div>
+            <h1>MediaSteru</h1>
+            <p class="brand-katakana">— メディアステル —</p>
+          </div>
         </div>
       </header>
 
-      <section class="control-card">
-        <label for="url-input">Video or page URL</label>
-        <div class="url-row">
-          <input id="url-input" type="url" spellcheck="false" placeholder="https://…" />
-          <button id="paste-button" class="button secondary">Paste</button>
-          <button id="download-button" class="button secondary">Download URL</button>
-          <button id="hunt-button" class="button primary">Open Hunter</button>
-        </div>
-        <div class="option-row">
-          <div class="folder-control">
-            <label for="folder-input">Output folder</label>
-            <div class="field-button">
-              <input id="folder-input" readonly placeholder="Choose where files will be saved" />
-              <button id="folder-button" class="button subtle">Browse</button>
+      <div class="workspace">
+        <nav class="sidebar surface-frame" aria-label="Main sections">
+          <button class="nav-item active" data-view="downloads" aria-pressed="true">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="presentation">
+                <path d="M12 4v10" />
+                <path d="m7.5 10 4.5 4.5 4.5-4.5" />
+                <path d="M5 19h14" />
+              </svg>
+            </span>
+            <span>Downloads</span>
+            <span id="download-count" class="nav-count">0</span>
+          </button>
+          <button class="nav-item" data-view="library" aria-pressed="false">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" role="presentation">
+                <rect x="4" y="3.5" width="16" height="17" rx="3" />
+                <path d="M8 8h8M8 12h8M8 16h5" />
+              </svg>
+            </span>
+            <span>Library</span>
+            <span id="library-count" class="nav-count">0</span>
+          </button>
+        </nav>
+
+        <div class="view-stack">
+          <div id="downloads-view" class="app-view">
+          <section class="command-panel surface-frame">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">&gt; ACQUIRE</p>
+                <h2>Bring media home</h2>
+              </div>
             </div>
-          </div>
-          <div class="format-control">
-            <label for="format-select">Format</label>
-            <select id="format-select">
-              <option value="mp4">MP4</option>
-              <option value="mkv">MKV</option>
-              <option value="mp3">MP3</option>
-            </select>
-          </div>
-          <div class="quality-control">
-            <label for="quality-select">Quality</label>
-            <select id="quality-select">
-              <option value="720">720p</option>
-              <option value="1080" selected>1080p</option>
-              <option value="1440">1440p</option>
-              <option value="2160">2160p</option>
-              <option value="best">Best</option>
-            </select>
+
+            <label class="sr-only" for="url-input">Video or page URL</label>
+            <div class="command-line">
+              <span class="command-prompt" aria-hidden="true">›</span>
+              <input id="url-input" type="url" spellcheck="false" placeholder="Paste a video URL or a page to hunt…" />
+              <span class="input-shortcut"><kbd>Ctrl</kbd><span>+</span><kbd>L</kbd></span>
+              <button id="paste-button" class="button ghost">Paste</button>
+              <button id="download-button" class="button primary">Download</button>
+            </div>
+
+            <div class="option-row">
+              <div class="folder-control">
+                <label for="folder-input">Destination</label>
+                <div class="field-button">
+                  <input id="folder-input" readonly placeholder="Choose an output folder" />
+                  <button id="folder-button" class="button subtle">Browse</button>
+                </div>
+              </div>
+              <div class="select-control">
+                <label for="format-select">Format</label>
+                <select id="format-select">
+                  <option value="mp4">MP4</option>
+                  <option value="mkv">MKV</option>
+                  <option value="mp3">MP3</option>
+                </select>
+              </div>
+              <div class="select-control">
+                <label for="quality-select">Quality</label>
+                <select id="quality-select">
+                  <option value="720">720p</option>
+                  <option value="1080" selected>1080p</option>
+                  <option value="1440">1440p</option>
+                  <option value="2160">2160p</option>
+                  <option value="best">Best</option>
+                </select>
+              </div>
+              <div class="source-actions">
+                <span class="source-label">More sources</span>
+                <div>
+                  <button id="import-button" class="button ghost">Import JSON</button>
+                  <button id="hunt-button" class="button hunter">Open Hunter</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="queue-card surface-frame">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">&gt; QUEUE</p>
+                <h2>Download activity</h2>
+              </div>
+              <p>Two jobs can run together; processing continues if this window reloads.</p>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>#</th><th>Name / Link</th><th>Format</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
+                <tbody id="queue-body"></tbody>
+              </table>
+              <div id="empty-state" class="empty-state">
+                <div class="empty-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="presentation">
+                    <path d="M12 4v10" />
+                    <path d="m7.5 10 4.5 4.5 4.5-4.5" />
+                    <path d="M5 19h14" />
+                  </svg>
+                </div>
+                <p class="eyebrow">QUEUE IS CLEAR</p>
+                <h3>Your next download starts here</h3>
+                <p>Paste a direct URL, import a list, or hunt a stream from a webpage.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+          <div id="library-view" class="app-view" hidden>
+            <section class="library-card surface-frame">
+            <div class="section-heading library-heading">
+              <div>
+                <p class="eyebrow">LOCAL / LIBRARY</p>
+                <h2>Downloaded media</h2>
+              </div>
+              <div class="library-search-wrap">
+                <span aria-hidden="true">⌕</span>
+                <input id="library-search" type="search" placeholder="Search title or path…" />
+              </div>
+            </div>
+            <div id="library-list" class="library-list"></div>
+            <div id="library-empty" class="empty-state library-empty">
+              <div class="empty-icon">▣</div>
+              <p class="eyebrow">LOCAL LIBRARY</p>
+              <h3>Your library is empty</h3>
+              <p>Completed downloads are indexed here automatically.</p>
+            </div>
+            </section>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section class="queue-card">
-        <div class="section-heading"><div><h2>Download queue</h2><p>Captured streams start automatically</p></div></div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>#</th><th>Name / Link</th><th>Format</th><th>Status</th><th>Progress</th><th></th></tr></thead>
-            <tbody id="queue-body"></tbody>
-          </table>
-          <div id="empty-state" class="empty-state">
-            <div class="empty-icon">↓</div>
-            <h3>No downloads yet</h3>
-            <p>Paste a direct link or open Hunter and play a video.</p>
-          </div>
-        </div>
-      </section>
-
-      <footer class="status-bar">
+      <footer class="status-bar surface-frame">
         <div class="status-message"><span id="status-dot" class="status-dot info"></span><span id="status-text">Ready</span></div>
         <button id="error-log-button" class="text-button" hidden>Open error log</button>
       </footer>

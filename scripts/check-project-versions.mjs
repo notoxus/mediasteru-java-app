@@ -20,12 +20,14 @@ function match(text, pattern, label) {
   return value;
 }
 
-const [pom, properties, updateChecker, electronPackageText, electronLockText, androidGradle, releaseWorkflow, runSh, runBat] = await Promise.all([
+const [pom, properties, updateChecker, electronPackageText, electronLockText, cliCargo, cliLock, androidGradle, releaseWorkflow, runSh, runBat] = await Promise.all([
   read('pom.xml'),
   read('src/main/resources/version.properties'),
-  read('src/main/java/com/videodownloader/controller/UpdateChecker.java'),
+  read('src/main/java/com/mediasteru/controller/UpdateChecker.java'),
   read('electron/package.json'),
   read('electron/package-lock.json'),
+  read('cli/Cargo.toml'),
+  read('cli/Cargo.lock'),
   read('companion-android/app/build.gradle.kts'),
   read('.github/workflows/release.yml'),
   read('tools/run.sh'),
@@ -33,11 +35,13 @@ const [pom, properties, updateChecker, electronPackageText, electronLockText, an
 ]);
 
 const pomVersion = match(pom.slice(0, 1_000), /<version>([^<]+)<\/version>/, 'pom.xml project version');
-const assemblyVersion = match(pom, /<finalName>VideoDownloader-v([^<]+)<\/finalName>/, 'pom.xml assembly version');
+const assemblyVersion = match(pom, /<finalName>MediaSteru-v([^<]+)<\/finalName>/, 'pom.xml assembly version');
 const propertiesVersion = match(properties, /^version=(.+)$/m, 'version.properties');
 const fallbackVersion = match(updateChecker, /DEFAULT_FALLBACK_VERSION\s*=\s*"v([^"]+)"/, 'UpdateChecker fallback version');
 const electronVersion = JSON.parse(electronPackageText).version;
 const electronLock = JSON.parse(electronLockText);
+const cliVersion = match(cliCargo, /^version\s*=\s*"([^"]+)"/m, 'CLI Cargo.toml version');
+const cliLockVersion = match(cliLock, /name = "mediasteru-cli"\nversion = "([^"]+)"/, 'CLI Cargo.lock version');
 const androidVersion = match(androidGradle, /versionName\s*=\s*"([^"]+)"/, 'Android versionName');
 
 for (const [label, version] of [
@@ -47,6 +51,8 @@ for (const [label, version] of [
   ['Electron package.json', electronVersion],
   ['Electron package-lock.json', electronLock.version],
   ['Electron package-lock root package', electronLock.packages?.['']?.version],
+  ['CLI Cargo.toml', cliVersion],
+  ['CLI Cargo.lock', cliLockVersion],
   ['Android versionName', androidVersion],
 ]) expect(label, version, pomVersion);
 if (expectedVersion) expect('Release tag', expectedVersion, pomVersion);
@@ -72,5 +78,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Version ${pomVersion} is synchronized across Java, Electron, Android, and release metadata.`);
+console.log(`Version ${pomVersion} is synchronized across Java, Electron, CLI, Android, and release metadata.`);
 console.log(`Java/JRE ${javaSource} is synchronized across Maven, launchers, and desktop release jobs.`);

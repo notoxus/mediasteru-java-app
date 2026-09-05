@@ -1,11 +1,11 @@
 # Release signing keystore
 
-This folder holds `videodownloader-release.jks` — the private key used to sign
+This folder holds `mediasteru-release.jks` — the private key used to sign
 release builds of both Android apps (`android/` standalone app and
 `companion-android/` companion app). It contains two key aliases:
 
-- `standalone` — signs the standalone app (`com.videodownloader.android`)
-- `companion` — signs the companion app (`com.videodownloader.companion`)
+- `standalone` — signs the standalone app (`com.mediasteru.android`)
+- `companion` — signs the companion app (`com.mediasteru.companion`)
 
 ## ⚠️ Back this up. Losing it is permanent.
 
@@ -16,7 +16,7 @@ update that app again under the same package name — the only fix is telling
 users to uninstall and install a "new" app from scratch.
 
 **Do this now:**
-1. Copy `videodownloader-release.jks` to at least one other location you
+1. Copy `mediasteru-release.jks` to at least one other location you
    control (a password manager's file storage, an encrypted USB drive, a
    private cloud folder). Do **not** email it to yourself in plaintext.
 2. Also back up `../android/keystore.properties` and
@@ -45,7 +45,7 @@ installing.
 ## Recreating `keystore.properties` if lost (but keystore intact)
 
 ```properties
-storeFile=../keystore/videodownloader-release.jks
+storeFile=../keystore/mediasteru-release.jks
 storePassword=<store password>
 keyAlias=standalone   # or "companion" in companion-android/keystore.properties
 keyPassword=<same as storePassword — PKCS12 requires they match>

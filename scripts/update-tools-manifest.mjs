@@ -47,7 +47,7 @@ const definitions = {
 };
 
 async function request(url) {
-  const response = await fetch(url, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'VideoDownloader dependency updater' } });
+  const response = await fetch(url, { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'MediaSteru dependency updater' } });
   if (!response.ok) throw new Error(`GitHub request failed (${response.status}): ${url}`);
   return response;
 }
