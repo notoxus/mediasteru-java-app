@@ -23,13 +23,29 @@ The client currently supports:
 - Direct downloads through checksum-verified yt-dlp, FFmpeg, and Deno binaries.
 - Video quality selection from 720p through 2160p or Best, with 1080p as the default.
 - MP4 conversion using MKV download, stream copy, then H.264/AAC fallback.
-- A built-in temporary Hunting window using Electron `session.webRequest`; no extension or external Chromium installation is required.
-- Captured Referer/request headers forwarded to yt-dlp and FFmpeg.
-- A main-process download queue with two concurrent jobs, retry, cancel, remove,
-  progress, and exact final output paths.
+- A built-in temporary Hunting window using Chromium's Network debugger for
+  ordinary, Service Worker, iframe, and MSE traffic; no extension or external
+  Chromium installation is required.
+- An explicit Hunter capture flow: candidates stay scoped to their browser
+  window. Response bodies are validated as HLS/DASH manifests instead of
+  trusting a URL or MIME type. **Download video** appears only after media
+  playback, including playback inside a cross-site iframe. It remains available
+  while that video is active and opens a compact format/quality chooser before
+  sending the candidate to the review queue.
+- Captured Referer/request headers plus target-scoped Hunter session cookies
+  are forwarded to the downloader. HLS bodies are snapshotted in Chromium and
+  served through a short-lived localhost bridge, so one-shot manifest URLs are
+  not requested again. Master HLS manifests are narrowed to the selected quality
+  before FFmpeg starts. Sensitive data is redacted from UI/API snapshots.
+- A main-process download queue with two concurrent jobs. Each review row starts
+  with **Download**, then exposes **Pause/Resume**, **Cancel**, and **Remove** as
+  distinct actions. Pause preserves yt-dlp's partial checkpoint; Cancel keeps
+  the stopped item in the queue, while Remove deletes the row.
 - Bulk JSON import and a local-network companion endpoint on port `8765`.
 - A local SQLite media library with search, Play, Open Folder, and Copy Path.
-- Optional mpv discovery and playback; downloading still works when mpv is absent.
+- Optional mpv discovery plus JSON IPC playback control. MP3 files use an
+  audio-only queue with Now Playing progress, pause/resume, previous, next,
+  stop, and automatic advance; downloading still works when mpv is absent.
 - Native folder selection, clipboard paste, status messages, and bounded diagnostic logs.
 - A localhost-only v1 control API used by the Rust CLI/TUI. The existing `/add`, `/capture`, and `/ping` companion routes remain compatible with the Android app.
 
@@ -40,6 +56,7 @@ Keep Electron running because it owns the download queue, SQLite library, depend
 ```bash
 cargo build --release --manifest-path cli/Cargo.toml
 ./cli/target/release/mediasteru status
+./cli/target/release/mediasteru player
 ./cli/target/release/mediasteru tui
 ```
 

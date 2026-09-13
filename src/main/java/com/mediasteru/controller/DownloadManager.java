@@ -48,15 +48,27 @@ public class DownloadManager implements Observer {
 		this.gui = gui;
 	}
 
-	public void enqueuePendingTask(int rowIndex) {
-		DownloadTask task = pendingTasks.remove(rowIndex);
+	public boolean enqueuePendingTask(int rowIndex) {
+		DownloadTask task = pendingTasks.get(rowIndex);
+		if (task == null) {
+			return false;
+		}
+		if (!task.isConfigured()) {
+			if (gui != null) {
+				gui.logToConsole("=> [Queue] Choose options for this captured stream before starting it.");
+			}
+			return false;
+		}
+		pendingTasks.remove(rowIndex);
 		if (task != null) {
 			try {
 				downloadQueue.put(task);
+				return true;
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
 		}
+		return false;
 	}
 
 	public void removePendingTask(int rowIndex) {
@@ -93,7 +105,7 @@ public class DownloadManager implements Observer {
 				System.out.println("Remaining: " + remaining + " video.");
 				if (strategy != null) {
 					strategy.startDownload(task.url, task.savePath, task.format, task.trimSection, task.preciseCut,
-							this, task.referer, task.requestHeaders);
+							this, task.referer, task.requestHeaders, task.quality);
 				}
 
 			} catch (InterruptedException e) {
@@ -166,33 +178,40 @@ public class DownloadManager implements Observer {
 
 	public void processAutoCapture(String url, String referer, Map<String, String> requestHeaders) {
 		Toolkit.getDefaultToolkit().beep();
+		System.out.println("\n[Auto-Capture] Stream caught and added to the review queue: " + url);
+		SwingUtilities.invokeLater(() -> {
+			if (gui == null) return;
+			int newRow = gui.addQueueItem(url, "Choose options", "Captured");
+			pendingTasks.put(newRow,
+					new DownloadTask(url, null, "mp4", "1080", null, false, newRow, referer, requestHeaders));
+			gui.logToConsole("=> [Hunter] Captured a stream (Row " + newRow
+					+ "). Double-click it to choose format, quality, and folder.");
+			resolveTitleAsync(url, newRow);
+		});
+	}
 
-		DownloadOptionsDialog.Options opts = DownloadOptionsDialog
-				.show("Video Hunter has caught a download link!\n\nTarget: " + url);
-
-		if (opts != null) {
-			System.out.println("\n[Auto-Capture] Preparing, waiting for user to start...");
-			String savePath = FolderSelector.chooseSaveDirectory();
-
-			if (savePath != null && !savePath.isEmpty()) {
-				SwingUtilities.invokeLater(() -> {
-					if (gui != null) {
-						String formatLabel = opts.format.toUpperCase();
-						int newRow = gui.addQueueItem(url, formatLabel, "Waiting...");
-						pendingTasks.put(newRow,
-								new DownloadTask(url, savePath, opts.format, null, false, newRow, referer,
-										requestHeaders));
-						gui.logToConsole(
-								"=> [Hunter] Added captured link to list (Row " + newRow + "). Ready to download.");
-						resolveTitleAsync(url, newRow);
-					}
-				});
-			} else {
-				System.out.println("=> Canceled cuz you didn't choose saved directory.");
-			}
-		} else {
-			System.out.println("\n[Auto-Capture] Skip the trash links: " + url);
+	public boolean configurePendingTask(int rowIndex) {
+		DownloadTask task = pendingTasks.get(rowIndex);
+		if (task == null) return false;
+		DownloadOptionsDialog.Options opts = DownloadOptionsDialog.show("Choose options for the captured stream.");
+		if (opts == null) return false;
+		String savePath = FolderSelector.chooseSaveDirectory();
+		if (savePath == null || savePath.isBlank()) return false;
+		task.format = opts.format;
+		task.quality = opts.quality;
+		task.savePath = savePath;
+		if (gui != null) {
+			gui.updateQueueItemFormat(rowIndex, formatLabel(task));
+			gui.updateQueueItemStatus(rowIndex, "Waiting...", "0%");
+			gui.logToConsole("=> [Queue] Stream options saved.");
 		}
+		return true;
+	}
+
+	private String formatLabel(DownloadTask task) {
+		if (task.format.equalsIgnoreCase("mp3")) return "MP3";
+		String quality = task.quality.equalsIgnoreCase("best") ? "Best" : task.quality + "p";
+		return task.format.toUpperCase() + " · " + quality;
 	}
 
 	private void resolveTitleAsync(String url, int rowIndex) {
@@ -218,7 +237,7 @@ public class DownloadManager implements Observer {
 			task.trimSection = trimOpts.trimSection;
 			task.preciseCut = trimOpts.preciseCut;
 			if (gui != null) {
-				String formatLabel = task.format.toUpperCase() + (task.trimSection != null ? " ✂" : "");
+				String formatLabel = formatLabel(task) + (task.trimSection != null ? " ✂" : "");
 				gui.updateQueueItemFormat(row, formatLabel);
 			}
 		}
@@ -255,7 +274,8 @@ public class DownloadManager implements Observer {
 						if (opts == null)
 							return;
 
-						String formatLabel = opts.format.toUpperCase();
+						String formatLabel = opts.format.equalsIgnoreCase("mp3") ? "MP3"
+								: opts.format.toUpperCase() + " · " + (opts.quality.equalsIgnoreCase("best") ? "Best" : opts.quality + "p");
 						boolean resolveTitles = links.size() <= 20;
 
 						for (String link : links) {
@@ -264,7 +284,7 @@ public class DownloadManager implements Observer {
 							int newRow = (gui != null) ? gui.addQueueItem(display, formatLabel, "Waiting...") : -1;
 							if (newRow != -1) {
 								pendingTasks.put(newRow,
-										new DownloadTask(link, savePath, opts.format, null, false, newRow));
+										new DownloadTask(link, savePath, opts.format, opts.quality, null, false, newRow));
 								if (links.size() > 1 && resolveTitles) {
 									resolveTitleAsync(link, newRow);
 								}
@@ -318,8 +338,8 @@ public class DownloadManager implements Observer {
 										: "Episode " + epNumber);
 
 						if (gui != null) {
-							int newRow = gui.addQueueItem(fileName, "MP4", "Waiting...");
-							pendingTasks.put(newRow, new DownloadTask(m3u8Url, savePath, "mp4", null, false, newRow));
+							int newRow = gui.addQueueItem(fileName, "MP4 · 1080p", "Waiting...");
+							pendingTasks.put(newRow, new DownloadTask(m3u8Url, savePath, "mp4", "1080", null, false, newRow));
 						}
 					}
 					if (gui != null)
@@ -336,6 +356,7 @@ public class DownloadManager implements Observer {
 		String url;
 		String savePath;
 		String format;
+		String quality;
 		String trimSection; // null = full video
 		boolean preciseCut;
 		int rowIndex;
@@ -344,24 +365,34 @@ public class DownloadManager implements Observer {
 
 		public DownloadTask(String url, String savePath, String format, String trimSection, boolean preciseCut,
 				int rowIndex) {
-			this(url, savePath, format, trimSection, preciseCut, rowIndex, null);
+			this(url, savePath, format, "1080", trimSection, preciseCut, rowIndex, null, Map.of());
 		}
 
 		public DownloadTask(String url, String savePath, String format, String trimSection, boolean preciseCut,
 				int rowIndex, String referer) {
-			this(url, savePath, format, trimSection, preciseCut, rowIndex, referer, Map.of());
+			this(url, savePath, format, "1080", trimSection, preciseCut, rowIndex, referer, Map.of());
 		}
 
-		public DownloadTask(String url, String savePath, String format, String trimSection, boolean preciseCut,
+		public DownloadTask(String url, String savePath, String format, String quality, String trimSection,
+				boolean preciseCut, int rowIndex) {
+			this(url, savePath, format, quality, trimSection, preciseCut, rowIndex, null, Map.of());
+		}
+
+		public DownloadTask(String url, String savePath, String format, String quality, String trimSection, boolean preciseCut,
 				int rowIndex, String referer, Map<String, String> requestHeaders) {
 			this.url = url;
 			this.savePath = savePath;
 			this.format = format;
+			this.quality = quality;
 			this.trimSection = trimSection;
 			this.preciseCut = preciseCut;
 			this.rowIndex = rowIndex;
 			this.referer = referer;
 			this.requestHeaders = requestHeaders == null ? Map.of() : Map.copyOf(requestHeaders);
+		}
+
+		boolean isConfigured() {
+			return savePath != null && !savePath.isBlank();
 		}
 	}
 }

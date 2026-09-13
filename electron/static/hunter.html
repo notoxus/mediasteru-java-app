@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MediaSteru Hunter</title>
+    <link rel="stylesheet" href="hunter.css" />
+  </head>
+  <body>
+    <nav class="hunter-toolbar" aria-label="Hunter navigation">
+      <div class="navigation-buttons">
+        <button id="hunter-back" class="icon-button" type="button" aria-label="Go back" title="Back" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6" /></svg>
+        </button>
+        <button id="hunter-forward" class="icon-button" type="button" aria-label="Go forward" title="Forward" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 6 6 6-6 6" /></svg>
+        </button>
+        <button id="hunter-reload" class="icon-button" type="button" aria-label="Reload page" title="Reload">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8a8 8 0 1 0 1 7" /><path d="M19 3v5h-5" /></svg>
+        </button>
+      </div>
+      <form id="hunter-address-form" class="address-form">
+        <div id="hunter-address-shell" class="address-shell">
+          <svg class="address-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17Z" /><path d="M3.8 9h16.4M3.8 15h16.4M12 3.5c2.2 2.3 3.3 5.1 3.3 8.5S14.2 18.2 12 20.5M12 3.5C9.8 5.8 8.7 8.6 8.7 12s1.1 6.2 3.3 8.5" /></svg>
+          <input id="hunter-address" type="text" inputmode="search" autocomplete="off" spellcheck="false" aria-label="Search or enter a website address" placeholder="Search or enter a URL…" />
+        </div>
+        <button id="hunter-go" class="search-button" type="submit" aria-label="Search or navigate" title="Search or navigate">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.4" /><path d="m15.6 15.6 4.1 4.1" /></svg>
+        </button>
+      </form>
+      <label class="hunting-mode" title="Watch network traffic for downloadable media">
+        <input id="hunter-mode" type="checkbox" checked />
+        <span class="toggle-track" aria-hidden="true"><span></span></span>
+        <span class="toggle-label">Hunting mode</span>
+      </label>
+      <span id="hunter-status" class="sr-only" role="status" aria-live="polite"></span>
+    </nav>
+    <script src="hunter-renderer.js"></script>
+  </body>
+</html>

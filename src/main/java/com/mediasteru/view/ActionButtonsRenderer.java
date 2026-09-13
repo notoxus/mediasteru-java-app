@@ -17,6 +17,7 @@ public class ActionButtonsRenderer extends JPanel implements TableCellRenderer {
 	private int hoveredRow = -1;
 	private int hoveredCol = -1;
 	private int hoverX = -1;
+	private boolean capturedStream;
 
 	public ActionButtonsRenderer() {
 		setOpaque(false);
@@ -32,6 +33,8 @@ public class ActionButtonsRenderer extends JPanel implements TableCellRenderer {
 	public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
 			int row, int column) {
 		setFont(table.getFont());
+		int modelRow = table.convertRowIndexToModel(row);
+		capturedStream = "Captured".equals(table.getModel().getValueAt(modelRow, 3));
 		return this;
 	}
 
@@ -56,7 +59,7 @@ public class ActionButtonsRenderer extends JPanel implements TableCellRenderer {
 		boolean hoverRemove = isHovered && (hoverX >= mid && hoverX <= w);
 
 		g2.setFont(getFont());
-		drawFlatButton(g2, margin, btnWidth, h, "Trim", hoverTrim, TRIM_ACCENT);
+		drawFlatButton(g2, margin, btnWidth, h, capturedStream ? "Options" : "Trim", hoverTrim, TRIM_ACCENT);
 		drawFlatButton(g2, margin + btnWidth + gap, btnWidth, h, "Remove", hoverRemove, REMOVE_ACCENT);
 
 		g2.dispose();

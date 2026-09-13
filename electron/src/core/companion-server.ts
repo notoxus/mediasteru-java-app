@@ -8,6 +8,8 @@ import {
   DownloadTask,
   EnqueueDownloadRequest,
   LibraryItem,
+  PlaybackCommand,
+  PlaybackState,
 } from '../types';
 
 type CaptureSink = (capture: CapturedMedia) => void;
@@ -17,9 +19,13 @@ export interface ControlApi {
   listDownloads(): DownloadTask[];
   enqueueDownload(request: EnqueueDownloadRequest): DownloadTask;
   cancelDownload(id: string): boolean;
+  pauseDownload(id: string): boolean;
+  resumeDownload(id: string): boolean;
   retryDownload(id: string): boolean;
   listLibrary(): LibraryItem[];
   playLibraryItem(id: number): Promise<void>;
+  playerState(): PlaybackState;
+  controlPlayer(command: PlaybackCommand): Promise<PlaybackState>;
   defaultDownloadPath(): string;
 }
 
@@ -58,7 +64,7 @@ export class CompanionServer {
     this.server = null;
   }
 
-  publish(event: 'downloads' | 'library', value: object): void {
+  publish(event: 'downloads' | 'library' | 'player', value: object): void {
     const payload = `event: ${event}\ndata: ${JSON.stringify(value)}\n\n`;
     for (const client of this.eventClients) client.write(payload);
   }
@@ -155,15 +161,20 @@ export class CompanionServer {
         this.json(response, 202, { download: task });
         return;
       }
-      const downloadAction = requestUrl.pathname.match(/^\/v1\/downloads\/([^/]+)\/(cancel|retry)$/);
+      const downloadAction = requestUrl.pathname.match(/^\/v1\/downloads\/([^/]+)\/(cancel|pause|resume|retry)$/);
       if (downloadAction && request.method === 'POST') {
         const id = decodeURIComponent(downloadAction[1]);
-        const changed = downloadAction[2] === 'cancel'
+        const action = downloadAction[2];
+        const changed = action === 'cancel'
           ? this.control.cancelDownload(id)
-          : this.control.retryDownload(id);
+          : action === 'pause'
+            ? this.control.pauseDownload(id)
+            : action === 'resume'
+              ? this.control.resumeDownload(id)
+              : this.control.retryDownload(id);
         this.json(response, changed ? 200 : 409, {
           status: changed ? 'ok' : 'error',
-          message: changed ? undefined : `Download ${id} cannot be ${downloadAction[2] === 'retry' ? 'retried' : 'canceled'}.`,
+          message: changed ? undefined : `Download ${id} cannot perform ${action}.`,
         });
         return;
       }
@@ -179,6 +190,16 @@ export class CompanionServer {
       if (playAction && request.method === 'POST') {
         await this.control.playLibraryItem(Number(playAction[1]));
         this.json(response, 202, { status: 'ok' });
+        return;
+      }
+      if (requestUrl.pathname === '/v1/player' && request.method === 'GET') {
+        this.json(response, 200, { player: this.control.playerState() });
+        return;
+      }
+      const playerAction = requestUrl.pathname.match(/^\/v1\/player\/(toggle|next|previous|stop)$/);
+      if (playerAction && request.method === 'POST') {
+        const player = await this.control.controlPlayer(playerAction[1] as PlaybackCommand);
+        this.json(response, 200, { player });
         return;
       }
       if (requestUrl.pathname === '/v1/events' && request.method === 'GET') {

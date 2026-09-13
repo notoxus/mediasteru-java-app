@@ -275,6 +275,15 @@ public class AppGUI extends JFrame {
 				int column = queueTable.columnAtPoint(e.getPoint());
 				int viewRow = queueTable.rowAtPoint(e.getPoint());
 
+				if (viewRow >= 0 && viewRow < queueTable.getRowCount() && column != 5 && e.getClickCount() == 2) {
+					int row = queueTable.convertRowIndexToModel(viewRow);
+					String status = tableModel.getValueAt(row, 3).toString();
+					if (!status.equals("Downloading...") && !status.equals("Loading...") && !status.equals("Completed")) {
+						manager.configurePendingTask(row);
+					}
+					return;
+				}
+
 				if (viewRow < queueTable.getRowCount() && viewRow >= 0 && column == 5) {
 					int row = queueTable.convertRowIndexToModel(viewRow);
 					String status = tableModel.getValueAt(row, 3).toString();
@@ -288,8 +297,12 @@ public class AppGUI extends JFrame {
 					int mid = cellRect.width / 2;
 
 					if (xInCell < mid) {
-						// Clicked Trim
-						manager.openTrimDialog(row);
+						// A captured stream must be configured before it can be downloaded.
+						if (status.equals("Captured")) {
+							manager.configurePendingTask(row);
+						} else {
+							manager.openTrimDialog(row);
+						}
 					} else {
 						// Clicked Remove
 						manager.removePendingTask(row);
@@ -407,8 +420,9 @@ public class AppGUI extends JFrame {
 				if (status.equals("Downloading...") || status.equals("Loading...") || status.equals("Completed")) {
 					continue;
 				}
-				manager.enqueuePendingTask(row);
-				updateQueueItemStatus(row, "In Queue", "0%");
+				if (manager.enqueuePendingTask(row)) {
+					updateQueueItemStatus(row, "In Queue", "0%");
+				}
 			}
 			queueTable.clearSelection();
 		});

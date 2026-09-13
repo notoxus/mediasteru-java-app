@@ -14,12 +14,12 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::Line,
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState, Tabs},
+    widgets::{Block, Borders, Cell, Gauge, Paragraph, Row, Table, TableState, Tabs},
 };
 
 use crate::{
     api::ApiClient,
-    model::{DownloadTask, LibraryItem},
+    model::{DownloadTask, LibraryItem, PlaybackState},
 };
 
 #[derive(Clone, Copy, PartialEq)]
@@ -33,6 +33,7 @@ struct App {
     view: View,
     downloads: Vec<DownloadTask>,
     library: Vec<LibraryItem>,
+    player: PlaybackState,
     selected: usize,
     input: String,
     editing: bool,
@@ -49,6 +50,7 @@ impl App {
             view: View::Downloads,
             downloads: Vec::new(),
             library: Vec::new(),
+            player: PlaybackState::idle(),
             selected: 0,
             input: String::new(),
             editing: false,
@@ -68,13 +70,15 @@ impl App {
             self.api.downloads(),
             self.api
                 .library((!self.library_query.is_empty()).then_some(self.library_query.as_str())),
+            self.api.player(),
         ) {
-            (Ok(downloads), Ok(library)) => {
+            (Ok(downloads), Ok(library), Ok(player)) => {
                 self.downloads = downloads;
                 self.library = library;
+                self.player = player;
                 self.clamp_selection();
             }
-            (Err(error), _) | (_, Err(error)) => self.message = error,
+            (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => self.message = error,
         }
     }
 
@@ -156,6 +160,22 @@ impl App {
             };
         }
     }
+
+    fn control_player(&mut self, command: &str) {
+        match self.api.player_command(command) {
+            Ok(player) => {
+                self.player = player;
+                self.message = match command {
+                    "toggle" => format!("Player is {}.", self.player.status),
+                    "next" => "Playing the next item.".to_owned(),
+                    "previous" => "Playing the previous item.".to_owned(),
+                    "stop" => "Playback stopped.".to_owned(),
+                    _ => "Playback updated.".to_owned(),
+                };
+            }
+            Err(error) => self.message = error,
+        }
+    }
 }
 
 pub fn run(api: ApiClient) -> io::Result<()> {
@@ -226,6 +246,10 @@ fn run_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App)
             KeyCode::Char('c') if app.view == View::Downloads => app.cancel_selected(),
             KeyCode::Char('r') if app.view == View::Downloads => app.retry_selected(),
             KeyCode::Char('p') if app.view == View::Library => app.play_selected(),
+            KeyCode::Char(' ') => app.control_player("toggle"),
+            KeyCode::Char('n') => app.control_player("next"),
+            KeyCode::Char('N') => app.control_player("previous"),
+            KeyCode::Char('s') => app.control_player("stop"),
             _ => {}
         }
     }
@@ -238,6 +262,7 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
             Constraint::Length(3),
             Constraint::Length(if app.editing { 3 } else { 0 }),
             Constraint::Min(8),
+            Constraint::Length(3),
             Constraint::Length(3),
         ])
         .split(frame.area());
@@ -277,16 +302,76 @@ fn draw(frame: &mut ratatui::Frame<'_>, app: &App) {
         View::Downloads => draw_downloads(frame, areas[2], app),
         View::Library => draw_library(frame, areas[2], app),
     }
+    draw_player(frame, areas[3], app);
     let help = match app.view {
-        View::Downloads => " a/d add · j/k move · c cancel · r retry · 2 library · q quit ",
-        View::Library => " / search · j/k move · p play · 1 downloads · q quit ",
+        View::Downloads => {
+            " a/d add · j/k move · c cancel · r retry · Space pause · n/N next/prev · q quit "
+        }
+        View::Library => {
+            " / search · j/k move · p play · Space pause · n/N next/prev · s stop · q quit "
+        }
+    };
+    let selected_error = (app.view == View::Downloads)
+        .then(|| app.downloads.get(app.selected))
+        .flatten()
+        .and_then(|task| task.error.as_deref());
+    let status_text = selected_error
+        .map(|error| format!("Error: {error}"))
+        .unwrap_or_else(|| app.message.clone());
+    frame.render_widget(
+        Paragraph::new(status_text)
+            .block(Block::default().title(help).borders(Borders::ALL))
+            .style(Style::default().fg(if selected_error.is_some() {
+                Color::LightRed
+            } else {
+                Color::Gray
+            })),
+        areas[4],
+    );
+}
+
+fn draw_player(frame: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, app: &App) {
+    if app.player.status == "idle" {
+        frame.render_widget(
+            Paragraph::new("No active media · select a Library item and press p")
+                .style(Style::default().fg(Color::DarkGray))
+                .block(
+                    Block::default()
+                        .title(" Now Playing ")
+                        .borders(Borders::ALL),
+                ),
+            area,
+        );
+        return;
+    }
+    let title = app.player.title.as_deref().unwrap_or("Unknown title");
+    let elapsed = format_duration(app.player.position);
+    let duration = format_duration(app.player.duration);
+    let queue_position = if app.player.queue_index >= 0 {
+        app.player.queue_index + 1
+    } else {
+        0
     };
     frame.render_widget(
-        Paragraph::new(app.message.as_str())
-            .block(Block::default().title(help).borders(Borders::ALL))
-            .style(Style::default().fg(Color::Gray)),
-        areas[3],
+        Gauge::default()
+            .block(
+                Block::default()
+                    .title(format!(" Now Playing · {title} · {} ", app.player.status))
+                    .borders(Borders::ALL),
+            )
+            .gauge_style(Style::default().fg(Color::Rgb(133, 167, 255)))
+            .ratio(app.player.progress())
+            .label(format!(
+                "{elapsed} / {duration} · {queue_position}/{} · {:.0}%",
+                app.player.queue_length, app.player.volume,
+            )),
+        area,
     );
+}
+
+fn format_duration(seconds: f64) -> String {
+    let total = seconds.max(0.0).round() as u64;
+    format!("{}:{:02}", total / 60, total % 60)
 }
 
 fn draw_downloads(frame: &mut ratatui::Frame<'_>, area: ratatui::layout::Rect, app: &App) {

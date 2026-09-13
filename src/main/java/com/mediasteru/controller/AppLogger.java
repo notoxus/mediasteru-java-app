@@ -8,20 +8,14 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-/**
- * Captures stdout/stderr for diagnostics while keeping normal console output in
- * development. Logs are bounded so the app data directory cannot grow forever.
- */
 public final class AppLogger {
 	private static final long MAX_LOG_BYTES = 2L * 1024 * 1024;
-	private static final int MAX_BACKUPS = 3;
 	private static final int MAX_RECENT_CHARS = 100_000;
 	private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 	private static final Path LOG_DIR = Path.of(System.getProperty("user.home"), ".MediaSteru", "logs");
@@ -33,9 +27,6 @@ public final class AppLogger {
 	private static OutputStream fileOutput;
 	private static long writtenBytes;
 
-	private AppLogger() {
-	}
-
 	public static synchronized void install() {
 		if (installed) {
 			return;
@@ -45,9 +36,7 @@ public final class AppLogger {
 		PrintStream originalErr = System.err;
 		try {
 			Files.createDirectories(LOG_DIR);
-			if (Files.exists(LOG_FILE) && Files.size(LOG_FILE) >= MAX_LOG_BYTES) {
-				rotateLogs();
-			}
+			clearPreviousSessionLogs();
 			openLogFile();
 		} catch (Exception e) {
 			originalErr.println("[Logger] Could not open diagnostic log: " + e.getMessage());
@@ -84,32 +73,26 @@ public final class AppLogger {
 			if (writtenBytes + length > MAX_LOG_BYTES) {
 				fileOutput.close();
 				fileOutput = null;
-				rotateLogs();
+				Files.deleteIfExists(LOG_FILE);
 				openLogFile();
 			}
 			fileOutput.write(data, offset, length);
 			fileOutput.flush();
 			writtenBytes += length;
 		} catch (Exception ignored) {
-			// Logging must never interrupt a download.
+			// Avoid interruption when downloaded process starting.
 		}
 	}
 
 	private static void openLogFile() throws IOException {
 		fileOutput = Files.newOutputStream(LOG_FILE, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-		writtenBytes = Files.exists(LOG_FILE) ? Files.size(LOG_FILE) : 0;
+		writtenBytes = Files.size(LOG_FILE);
 	}
-
-	private static void rotateLogs() throws IOException {
-		for (int index = MAX_BACKUPS; index >= 2; index--) {
-			Path previous = LOG_DIR.resolve("app.log." + (index - 1));
-			Path next = LOG_DIR.resolve("app.log." + index);
-			if (Files.exists(previous)) {
-				Files.move(previous, next, StandardCopyOption.REPLACE_EXISTING);
-			}
-		}
-		if (Files.exists(LOG_FILE)) {
-			Files.move(LOG_FILE, LOG_DIR.resolve("app.log.1"), StandardCopyOption.REPLACE_EXISTING);
+	// Clear the previous logs and override them with new ones.
+	private static void clearPreviousSessionLogs() throws IOException {
+		Files.deleteIfExists(LOG_FILE);
+		for (int index = 1; index <= 3; index++) {
+			Files.deleteIfExists(LOG_DIR.resolve("app.log." + index));
 		}
 	}
 

@@ -37,6 +37,16 @@ The first start synchronizes the checksum-verified yt-dlp, FFmpeg, and Deno
 binaries for the current OS/CPU. They are stored in the ignored `tools/`
 directory, so developers do not commit large binaries or update them manually.
 
+Pasted and imported URLs enter a review queue. While Hunting mode is enabled,
+play the intended video and wait for the green **Download video** button to
+appear immediately to the left of the Hunting mode switch. Click it to send the
+detected stream to the review queue. Select the rows you recognize and press
+**Start Selected**; use **Remove** for ads or unwanted streams.
+
+In the Electron queue, a reviewed row begins with **Download**. While active it
+becomes **Pause**, a paused job offers **Resume**, **Cancel** stops but keeps the
+row, and **Remove** deletes the row from the queue.
+
 ```bash
 cd electron
 npm run tools:sync   # download/update this machine
@@ -66,10 +76,11 @@ cargo build --release --manifest-path cli/Cargo.toml
 ./cli/target/release/mediasteru status
 ./cli/target/release/mediasteru get "https://example.com/video" --format mp4 --quality 1080
 ./cli/target/release/mediasteru library "tutorial"
+./cli/target/release/mediasteru player
 ./cli/target/release/mediasteru tui
 ```
 
-Running `mediasteru` without a subcommand also opens the TUI. Its main keys are `1`/`2` for Downloads/Library, `a` or `d` to add a URL, `j`/`k` to move, `c` to cancel, `r` to retry, `p` to play through mpv, and `q` to quit.
+Running `mediasteru` without a subcommand also opens the TUI. Its main keys are `1`/`2` for Downloads/Library, `a` or `d` to add a URL, `j`/`k` to move, `p` to play, `Space` to pause/resume, `n`/`N` for next/previous, `s` to stop, and `q` to quit. MP3 items use an audio-only playback queue and advance automatically when a track ends.
 
 The control API accepts localhost connections only. Optionally set the same `MEDIASTERU_CONTROL_TOKEN` environment variable for both Electron and the CLI to require a bearer token. See [`cli/README.md`](cli/README.md) for every command.
 
@@ -96,6 +107,8 @@ docker exec -it mediasteru mediasteru # opens the TUI
 
 Downloaded files appear in `./downloads`; SQLite data and bounded logs use the `mediasteru-data` volume. Port `8765` remains available for the Android companion. Because the container is headless, browser-window Hunting and host mpv playback remain desktop-client features.
 
+On startup, the container normalizes the mounted folders and then drops to the detected non-root UID/GID before launching MediaSteru. This prevents Docker-created `./downloads` directories from causing `Permission denied` failures. Unusual Linux ownership mappings can be overridden with `MEDIASTERU_UID` and `MEDIASTERU_GID`.
+
 The Compose file pulls `ghcr.io/notoxus/mediasteru:latest` and can also build from the local Dockerfile. Published images support Linux AMD64 and ARM64.
 
 If port `8765` is already occupied, start with `MEDIASTERU_HOST_PORT=9876 docker compose up -d`. The service still listens on `8765` inside the container, so the bundled CLI needs no extra configuration.
@@ -119,6 +132,7 @@ If port `8765` is already occupied, start with `MEDIASTERU_HOST_PORT=9876 docker
 | **Trim Before Download** | Cut a specific section (e.g. 01:30 → 02:45) and download only that clip — no full download needed |
 | **Local Library (Electron)** | Completed media is indexed in SQLite and can be searched, revealed, copied, or played through mpv |
 | **CLI / TUI (Electron host)** | Control the same queue and library from a small Rust terminal client |
+| **Music Player (CLI / TUI)** | Play downloaded MP3s with Now Playing progress, pause/resume, previous/next, stop, and automatic queue advance through mpv |
 
 ---
 
@@ -136,8 +150,9 @@ Many sites load video streams dynamically without a shareable URL. Hunting mode 
 
 1. Leave the input field **empty** and press **Enter**, or paste the site URL and press **Enter**.
 2. A dedicated browser window opens and navigates to the page.
-3. Play the video — the extension intercepts the stream URL (`.m3u8`, DASH, or any `application/x-mpegURL` response).
-4. The tab closes automatically and the download starts.
+3. Play the intended video. The extension watches for its stream URL (`.m3u8`, DASH, or any `application/x-mpegURL` response).
+4. When **Download with MediaSteru** appears, click it, choose the output format and quality, then add that stream to the review queue. The browser remains open.
+5. Select the queued row and press **Start Selected**. Remove it instead if it is an advertisement or an unexpected stream.
 
 > The app loads the extension automatically in a disposable Chromium profile; you do not need to find or select `manifest.json`.
 
@@ -207,7 +222,10 @@ The launcher recognizes common Chromium-family browsers on Windows, macOS, and L
 
 Captured request headers (including `Referer`) are forwarded to the downloader so streams protected by hotlink checks have the same request context as the browser.
 
-Captured URLs are sent via HTTP POST to the app on `localhost:8765`, then queued for download.
+Candidates are stored per browser tab and are not sent to the app merely because
+they were detected. Once media has started playing, the extension displays an
+app-owned Download label. Clicking it sends the latest candidate and its request
+context via HTTP POST to `localhost:8765`, where it enters the review queue.
 
 ---
 
@@ -310,10 +328,12 @@ git push origin -f v1.0.6
 
 ## Troubleshooting
 
-Both desktop clients show short, user-friendly status messages instead of a developer console. In Swing, click **Show details** when you need technical output. Electron only shows **Open error log** after an error. Swing logs live under `~/.MediaSteru/logs/`; Electron uses the operating system's standard application-data directory. Both log stores are bounded.
+Both desktop clients keep technical output away from the primary interface. In Swing, click **Show details** when you need it. Electron presents warnings and errors in native dialogs while diagnostics continue to the launching terminal and its bounded log file. Swing logs live under `~/.MediaSteru/logs/`; Electron uses the operating system's standard application-data directory.
 
-**The extension tab doesn't close / nothing gets captured**
+**The Download label does not appear**
 - Make sure the app is running before you open the capture browser.
+- Start playback of the intended video and reload its page once if the player
+  was already running before Hunting mode was enabled.
 - Check that port 8765 is not blocked by a firewall.
 - Some sites use DRM (Widevine) — encrypted streams cannot be downloaded.
 

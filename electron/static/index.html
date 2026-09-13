@@ -54,13 +54,13 @@
               </div>
             </div>
 
-            <label class="sr-only" for="url-input">Video or page URL</label>
+            <label class="sr-only" for="url-input">Video or playlist URL</label>
             <div class="command-line">
               <span class="command-prompt" aria-hidden="true">›</span>
-              <input id="url-input" type="url" spellcheck="false" placeholder="Paste a video URL or a page to hunt…" />
+              <input id="url-input" type="url" spellcheck="false" placeholder="Paste a video or playlist URL…" />
               <span class="input-shortcut"><kbd>Ctrl</kbd><span>+</span><kbd>L</kbd></span>
               <button id="paste-button" class="button ghost">Paste</button>
-              <button id="download-button" class="button primary">Download</button>
+              <button id="download-button" class="button primary">Add to Queue</button>
             </div>
 
             <div class="option-row">
@@ -93,7 +93,7 @@
                 <span class="source-label">More sources</span>
                 <div>
                   <button id="import-button" class="button ghost">Import JSON</button>
-                  <button id="hunt-button" class="button hunter">Open Hunter</button>
+                  <button id="hunt-button" class="button hunter" title="Open the URL above in Hunter, or Google when the field is empty">Open Hunter</button>
                 </div>
               </div>
             </div>
@@ -105,11 +105,14 @@
                 <p class="eyebrow">&gt; QUEUE</p>
                 <h2>Download activity</h2>
               </div>
-              <p>Two jobs can run together; processing continues if this window reloads.</p>
+              <div class="queue-heading-actions">
+                <p>Review captured streams, then start only the ones you trust.</p>
+                <button id="start-selected-button" class="button primary" disabled>Start Selected</button>
+              </div>
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>#</th><th>Name / Link</th><th>Format</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
+                <thead><tr><th><input id="queue-select-all" class="queue-selector" type="checkbox" aria-label="Select all items waiting for review" disabled /></th><th>Name / Link</th><th>Format</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead>
                 <tbody id="queue-body"></tbody>
               </table>
               <div id="empty-state" class="empty-state">
@@ -121,8 +124,8 @@
                   </svg>
                 </div>
                 <p class="eyebrow">QUEUE IS CLEAR</p>
-                <h3>Your next download starts here</h3>
-                <p>Paste a direct URL, import a list, or hunt a stream from a webpage.</p>
+                <h3>Your review queue starts here</h3>
+                <p>Add a direct URL, import a list, or hunt streams, then choose what to download.</p>
               </div>
             </div>
           </section>
@@ -132,18 +135,19 @@
             <section class="library-card surface-frame">
             <div class="section-heading library-heading">
               <div>
-                <p class="eyebrow">LOCAL / LIBRARY</p>
+                <p class="eyebrow">LIBRARY</p>
                 <h2>Downloaded media</h2>
               </div>
               <div class="library-search-wrap">
-                <span aria-hidden="true">⌕</span>
+                <svg class="library-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="10.5" cy="10.5" r="6.25" />
+                  <path d="m15.25 15.25 4.5 4.5" />
+                </svg>
                 <input id="library-search" type="search" placeholder="Search title or path…" />
               </div>
             </div>
             <div id="library-list" class="library-list"></div>
             <div id="library-empty" class="empty-state library-empty">
-              <div class="empty-icon">▣</div>
-              <p class="eyebrow">LOCAL LIBRARY</p>
               <h3>Your library is empty</h3>
               <p>Completed downloads are indexed here automatically.</p>
             </div>
@@ -152,10 +156,38 @@
         </div>
       </div>
 
-      <footer class="status-bar surface-frame">
-        <div class="status-message"><span id="status-dot" class="status-dot info"></span><span id="status-text">Ready</span></div>
-        <button id="error-log-button" class="text-button" hidden>Open error log</button>
-      </footer>
+      <span id="status-text" class="sr-only" role="status" aria-live="polite">Ready</span>
+
+      <dialog id="task-options-dialog" class="task-options-dialog" aria-labelledby="task-options-title">
+        <form id="task-options-form" method="dialog">
+          <p class="eyebrow">&gt; DOWNLOAD OPTIONS</p>
+          <h2 id="task-options-title">Configure queued stream</h2>
+          <p class="task-options-copy">Choose the file format and preferred video quality before starting this item.</p>
+          <div class="task-options-fields">
+            <label for="task-format-select">Format
+              <select id="task-format-select">
+                <option value="mp4">MP4</option>
+                <option value="mkv">MKV</option>
+                <option value="mp3">MP3 audio</option>
+              </select>
+            </label>
+            <label for="task-quality-select">Quality
+              <select id="task-quality-select">
+                <option value="360">360p</option>
+                <option value="720">720p</option>
+                <option value="1080">1080p</option>
+                <option value="1440">1440p</option>
+                <option value="2160">2160p</option>
+                <option value="best">Best available</option>
+              </select>
+            </label>
+          </div>
+          <div class="task-options-actions">
+            <button id="task-options-cancel" class="button ghost" type="button">Cancel</button>
+            <button id="task-options-save" class="button primary" type="submit">Save options</button>
+          </div>
+        </form>
+      </dialog>
     </main>
     <script src="renderer.js"></script>
   </body>

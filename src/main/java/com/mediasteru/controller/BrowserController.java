@@ -18,8 +18,6 @@ public class BrowserController {
 
 	private static final String BASE_CONFIG_PATH = System.getProperty("user.home") + File.separator
 			+ ".MediaSteru";
-	// Browser profiles are disposable runtime state. Keep them out of the
-	// persistent app directory, which should contain only settings and assets.
 	private static final String CHROME_PROFILE_PATH = new File(System.getProperty("java.io.tmpdir"),
 			"MediaSteruChrome-" + UUID.randomUUID()).getAbsolutePath();
 	private static final File SETTINGS_FILE = new File(BASE_CONFIG_PATH, "settings.properties");

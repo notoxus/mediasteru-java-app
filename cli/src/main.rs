@@ -12,7 +12,7 @@ use std::{
 
 use api::ApiClient;
 use clap::{Parser, Subcommand, ValueEnum};
-use model::{DownloadTask, LibraryItem};
+use model::{DownloadTask, LibraryItem, PlaybackState};
 
 #[derive(Parser)]
 #[command(
@@ -50,6 +50,16 @@ enum Command {
     Library { query: Option<String> },
     /// Play a library item through mpv.
     Play { id: i64 },
+    /// Show the active mpv session and playback progress.
+    Player,
+    /// Toggle play/pause for the active media.
+    Toggle,
+    /// Play the next item in the current media queue.
+    Next,
+    /// Restart or play the previous item in the current media queue.
+    Previous,
+    /// Stop the active media session.
+    Stop,
     /// Cancel a queued or active download.
     Cancel { id: String },
     /// Retry a failed or canceled download.
@@ -157,6 +167,14 @@ fn run() -> Result<(), String> {
             println!("Opened library item {id} in mpv.");
             Ok(())
         }
+        Command::Player => {
+            print_player(&api.player()?);
+            Ok(())
+        }
+        Command::Toggle => control_player(&api, "toggle"),
+        Command::Next => control_player(&api, "next"),
+        Command::Previous => control_player(&api, "previous"),
+        Command::Stop => control_player(&api, "stop"),
         Command::Cancel { id } => {
             api.cancel(&id)?;
             println!("Canceled {id}.");
@@ -172,6 +190,36 @@ fn run() -> Result<(), String> {
             tui::run(api).map_err(|error| error.to_string())
         }
     }
+}
+
+fn control_player(api: &ApiClient, command: &str) -> Result<(), String> {
+    print_player(&api.player_command(command)?);
+    Ok(())
+}
+
+fn print_player(player: &PlaybackState) {
+    if player.status == "idle" {
+        println!("Nothing is playing.");
+        return;
+    }
+    println!(
+        "{} · #{} · {}\n{} / {} · {} of {} · volume {:.0}% · {}\n{}",
+        player.media_kind.as_deref().unwrap_or("media"),
+        player.item_id.unwrap_or_default(),
+        player.title.as_deref().unwrap_or("Unknown title"),
+        format_duration(player.position),
+        format_duration(player.duration),
+        player.queue_index + 1,
+        player.queue_length,
+        player.volume,
+        player.status,
+        player.local_path.as_deref().unwrap_or(""),
+    );
+}
+
+fn format_duration(seconds: f64) -> String {
+    let total = seconds.max(0.0).round() as u64;
+    format!("{}:{:02}", total / 60, total % 60)
 }
 
 fn add_download(api: &ApiClient, args: &DownloadArgs) -> Result<DownloadTask, String> {

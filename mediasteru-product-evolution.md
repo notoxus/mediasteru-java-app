@@ -319,7 +319,7 @@ If it works well, the project can naturally grow into a media manager.
 
 ## Suggested Roadmap
 
-### Implementation Status — 2026-09-04
+### Implementation Status — 2026-09-05
 
 The first architecture slice is now implemented in the Electron client. The
 design borrows rmpc's separation of core state, protocol boundaries, and views:
@@ -338,6 +338,8 @@ download lifecycle itself.
 - [x] Keyboard-first Ratatui client sharing the Electron-owned core
 - [x] Headless Docker/Podman deployment reusing the same queue and media engine
 - [x] Multi-architecture GHCR image workflow and TTY-aware `mediasteru` wrapper
+- [x] mpv JSON IPC controller with audio/video queues and automatic advance
+- [x] CLI/TUI Now Playing state with play/pause, previous, next, and stop
 - [ ] Trim filmstrip/range selection in Electron
 - [ ] Playlist expansion from pasted page URLs
 - [ ] Application auto-update UI

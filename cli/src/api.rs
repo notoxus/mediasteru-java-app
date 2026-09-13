@@ -8,7 +8,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::model::{
     ActionResponse, AddDownload, DownloadResponse, DownloadTask, DownloadsResponse, ErrorResponse,
-    LibraryItem, LibraryResponse, StatusResponse,
+    LibraryItem, LibraryResponse, PlaybackState, PlayerResponse, StatusResponse,
 };
 
 #[derive(Clone)]
@@ -89,6 +89,18 @@ impl ApiClient {
         } else {
             Err("Playback failed".to_owned())
         }
+    }
+
+    pub fn player(&self) -> Result<PlaybackState, String> {
+        Ok(self
+            .request::<_, PlayerResponse>("GET", "/v1/player", None::<&()>)?
+            .player)
+    }
+
+    pub fn player_command(&self, command: &str) -> Result<PlaybackState, String> {
+        Ok(self
+            .request::<_, PlayerResponse>("POST", &format!("/v1/player/{command}"), None::<&()>)?
+            .player)
     }
 
     fn request<B: Serialize, R: DeserializeOwned>(

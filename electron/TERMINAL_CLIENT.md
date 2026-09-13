@@ -12,6 +12,8 @@ mediasteru add <url>                 add to the running queue
 mediasteru status                    compact queue status
 mediasteru library [query]           search local media
 mediasteru play <id>                 play through mpv
+mediasteru player                    show Now Playing
+mediasteru toggle|next|previous|stop control the active player
 mediasteru cancel|retry <id>         control a queue item
 mediasteru tui                       interactive terminal interface
 ```
@@ -40,10 +42,14 @@ Implemented protocol operations:
 - `POST /v1/downloads`
 - `GET /v1/downloads`
 - `POST /v1/downloads/:id/cancel`
+- `POST /v1/downloads/:id/pause`
+- `POST /v1/downloads/:id/resume`
 - `POST /v1/downloads/:id/retry`
 - `GET /v1/library`
 - `POST /v1/library/:id/play`
-- Server-Sent Events at `/v1/events` for queue progress
+- `GET /v1/player`
+- `POST /v1/player/:toggle|next|previous|stop`
+- Server-Sent Events at `/v1/events` for queue, library, and player state
 
 The current `/add`, `/capture`, and `/ping` routes remain compatibility endpoints
 for the phone companion. The v1 control routes reject non-loopback connections.
@@ -56,7 +62,8 @@ bearer token from terminal clients.
 2. [x] Implement the non-interactive `mediasteru` commands as a protocol client.
 3. [x] Add a TUI for queue and library navigation.
 4. [x] Add enqueue, cancel, retry, search, and mpv actions.
-5. Only then consider moving the headless core into a dedicated daemon. Electron
+5. [x] Add shared Now Playing state and mpv transport controls.
+6. Only then consider moving the headless core into a dedicated daemon. Electron
    can remain the core host until the daemon provides a clear maintenance or
    resource advantage.
 
@@ -72,7 +79,9 @@ bearer token from terminal clients.
 │ Linux tutorial              MP4     downloading  63%  8.2MiB/s  │
 │ Music video                 MP3     queued        —              │
 ├──────────────────────────────────────────────────────────────────┤
-│ j/k navigate · c cancel · r retry · p play · o reveal · q quit  │
+│ Now Playing  01:24 ━━━━━━━━━╺━━━━ 03:52  Space pause · n/N skip │
+├──────────────────────────────────────────────────────────────────┤
+│ j/k navigate · c cancel · r retry · p play · s stop · q quit    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 

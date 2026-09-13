@@ -23,6 +23,11 @@ mediasteru add <URL> [options]   queue without waiting
 mediasteru status                show the download queue
 mediasteru library [QUERY]       search downloaded media
 mediasteru play <ID>             open a library item in mpv
+mediasteru player                show Now Playing and progress
+mediasteru toggle                toggle play/pause
+mediasteru next                  play the next queued media item
+mediasteru previous              restart or play the previous item
+mediasteru stop                  stop playback
 mediasteru cancel <ID>           cancel queued/active work
 mediasteru retry <ID>            retry failed/canceled work
 mediasteru tui                   open the interactive interface
@@ -43,6 +48,9 @@ Run `mediasteru` with no subcommand to open the TUI.
 | `c` | Cancel the selected download |
 | `r` | Retry the selected failed/canceled download |
 | `p` | Play the selected library item through mpv |
+| `Space` | Toggle play/pause |
+| `n`, `N` | Next / previous media item |
+| `s` | Stop playback |
 | `Esc` | Close URL input |
 | `q` | Quit |
 
@@ -60,17 +68,15 @@ MEDIASTERU_CONTROL_TOKEN="choose-a-long-random-value" ./cli/target/release/media
 
 You can also pass `--token`, but the environment variable avoids placing the secret in shell history.
 
-## Docker alias
+## Docker
 
-The container image includes this exact CLI binary. After starting the service from the repository root, point a convenient shell alias at the TTY-aware wrapper:
+The container image includes this exact CLI binary. Run it inside the active service without installing anything on the host:
 
 ```bash
 docker compose up -d
-alias mediasteru="$PWD/docker/mediasteru"
-
-mediasteru status
-mediasteru get "https://example.com/video"
-mediasteru
+docker exec mediasteru mediasteru status
+docker exec mediasteru mediasteru get "https://example.com/video"
+docker exec -it mediasteru mediasteru
 ```
 
-Add the alias line to `~/.zshrc` or `~/.bashrc` to keep it. The wrapper uses Docker by default; set `MEDIASTERU_CONTAINER_ENGINE=podman` for Podman. In the headless container, downloads and library commands work normally, while browser-window Hunting and host mpv playback are intentionally unavailable.
+`docker exec` calls the bundled client in the existing container; `-it` only provides the interactive terminal required by the TUI. In the headless container, downloads and library commands work normally, while browser-window Hunting and host mpv playback are intentionally unavailable.

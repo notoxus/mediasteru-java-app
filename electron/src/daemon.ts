@@ -7,7 +7,15 @@ import { LibraryRepository } from './core/library-repository';
 import { PlayerService } from './core/player-service';
 import { Downloader } from './downloader';
 import { LogStore } from './log-store';
-import { CapturedMedia, DownloadFormat, DownloadQuality, DownloadTask } from './types';
+import {
+  CapturedMedia,
+  DownloadFormat,
+  DownloadQuality,
+  DownloadTask,
+  LibraryItem,
+  PlaybackQueueItem,
+  PlaybackState,
+} from './types';
 
 const projectRoot = resolve(process.env.MEDIASTERU_PROJECT_ROOT || resolve(__dirname, '..', '..'));
 const dataDirectory = resolve(process.env.MEDIASTERU_DATA_DIR || resolve(projectRoot, '.mediasteru-data'));
@@ -27,7 +35,24 @@ const log = (level: 'INFO' | 'WARN' | 'ERROR', message: string): void => {
 let companion: CompanionServer;
 let queue: DownloadQueue;
 const library = new LibraryRepository(dataDirectory);
-const player = new PlayerService(projectRoot, projectRoot);
+let lastPlaybackItemId: number | null = null;
+function publishPlayer(state: PlaybackState): void {
+  if (state.status === 'idle') lastPlaybackItemId = null;
+  if (state.status === 'playing' && state.itemId !== null && state.itemId !== lastPlaybackItemId) {
+    const item = library.list(2_000).find((candidate) => candidate.id === state.itemId);
+    if (item) {
+      library.markPlayed(item.localPath);
+      companion?.publish('library', { items: library.list() });
+    }
+    lastPlaybackItemId = state.itemId;
+  }
+  companion?.publish('player', { player: state });
+}
+const player = new PlayerService(
+  projectRoot,
+  projectRoot,
+  publishPlayer,
+);
 const downloader = new Downloader(
   projectRoot,
   projectRoot,
@@ -52,8 +77,29 @@ function enqueueCapture(capture: CapturedMedia): DownloadTask {
     quality: defaultQuality,
     referer: capture.referer,
     requestHeaders: capture.requestHeaders,
+    manifestBody: capture.manifestBody,
     name: labelForUrl(capture.url),
   });
+}
+
+function playbackItem(item: LibraryItem): PlaybackQueueItem {
+  return {
+    id: item.id,
+    title: item.title,
+    localPath: item.localPath,
+    format: item.format,
+  };
+}
+
+async function playLibraryItem(id: number): Promise<void> {
+  const items = library.list(2_000);
+  const item = items.find((candidate) => candidate.id === id);
+  if (!item) throw new Error(`Library item ${id} was not found.`);
+  const audio = item.format === 'mp3';
+  const playlist = items
+    .filter((candidate) => (candidate.format === 'mp3') === audio)
+    .map(playbackItem);
+  await player.play(item.localPath, playbackItem(item), playlist);
 }
 
 companion = new CompanionServer(
@@ -66,15 +112,13 @@ companion = new CompanionServer(
     listDownloads: () => queue.list(),
     enqueueDownload: (request) => queue.enqueue(request),
     cancelDownload: (id) => queue.cancel(id),
+    pauseDownload: (id) => queue.pause(id),
+    resumeDownload: (id) => queue.resume(id),
     retryDownload: (id) => queue.retry(id),
     listLibrary: () => library.list(2_000),
-    playLibraryItem: async (id) => {
-      const item = library.list(2_000).find((candidate) => candidate.id === id);
-      if (!item) throw new Error(`Library item ${id} was not found.`);
-      await player.play(item.localPath);
-      library.markPlayed(item.localPath);
-      companion.publish('library', { items: library.list() });
-    },
+    playLibraryItem,
+    playerState: () => player.state(),
+    controlPlayer: (command) => player.command(command),
     defaultDownloadPath: () => downloadDirectory,
   },
   Number.isFinite(port) ? port : 8765,
@@ -89,6 +133,7 @@ function shutdown(signal: string): void {
   shuttingDown = true;
   log('INFO', `Stopping headless core (${signal})`);
   companion.close();
+  player.close();
   library.close();
   process.exit(0);
 }
@@ -98,6 +143,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('uncaughtException', (error) => {
   log('ERROR', error.stack || error.message);
   companion?.close();
+  player.close();
   library.close();
   process.exit(1);
 });

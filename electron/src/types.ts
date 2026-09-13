@@ -1,5 +1,5 @@
 export type DownloadFormat = 'mp4' | 'mkv' | 'mp3';
-export type DownloadQuality = '720' | '1080' | '1440' | '2160' | 'best';
+export type DownloadQuality = '360' | '720' | '1080' | '1440' | '2160' | 'best';
 
 export interface DownloadRequest {
   id: string;
@@ -9,11 +9,13 @@ export interface DownloadRequest {
   quality: DownloadQuality;
   referer?: string;
   requestHeaders?: Record<string, string>;
+  /** HLS response captured inside Hunter's authenticated Chromium session. */
+  manifestBody?: string;
 }
 
 export interface DownloadEvent {
   id: string;
-  type: 'started' | 'progress' | 'processing' | 'log' | 'complete' | 'error' | 'canceled';
+  type: 'started' | 'progress' | 'processing' | 'log' | 'complete' | 'error' | 'canceled' | 'paused';
   percent?: number;
   speed?: string;
   message?: string;
@@ -22,10 +24,13 @@ export interface DownloadEvent {
 }
 
 export type DownloadTaskStatus =
+  | 'waiting'
   | 'queued'
   | 'preparing'
   | 'downloading'
   | 'processing'
+  | 'pausing'
+  | 'paused'
   | 'completed'
   | 'failed'
   | 'canceled';
@@ -46,8 +51,29 @@ export interface DownloadTask extends EnqueueDownloadRequest {
 
 export interface CapturedMedia {
   url: string;
+  title?: string;
   referer?: string;
   requestHeaders: Record<string, string>;
+  manifestBody?: string;
+  format?: DownloadFormat;
+  quality?: DownloadQuality;
+}
+
+/** Options that can be adjusted while a captured item is still in review. */
+export interface DownloadTaskOptions {
+  format: DownloadFormat;
+  quality: DownloadQuality;
+}
+
+export interface HunterNavigationState {
+  url: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  loading: boolean;
+  hunting: boolean;
+  candidateCount: number;
+  downloadReady: boolean;
+  error?: string;
 }
 
 export interface ToolStatus {
@@ -67,6 +93,29 @@ export interface LibraryItem {
   downloadedAt: string;
   lastPlayedAt: string | null;
   playbackPosition: number;
+}
+
+export type PlaybackStatus = 'idle' | 'playing' | 'paused';
+export type PlaybackCommand = 'toggle' | 'next' | 'previous' | 'stop';
+
+export interface PlaybackQueueItem {
+  id: number;
+  title: string;
+  localPath: string;
+  format: DownloadFormat;
+}
+
+export interface PlaybackState {
+  status: PlaybackStatus;
+  itemId: number | null;
+  title: string | null;
+  localPath: string | null;
+  mediaKind: 'audio' | 'video' | null;
+  position: number;
+  duration: number;
+  volume: number;
+  queueIndex: number;
+  queueLength: number;
 }
 
 export interface ImportedMedia {

@@ -23,5 +23,10 @@ public interface DownloadStrategy {
 		startDownload(url, savePath, format, trimSection, preciseCut, observer, referer);
 	}
 
+	default void startDownload(String url, String savePath, String format, String trimSection, boolean preciseCut,
+			Observer observer, String referer, Map<String, String> requestHeaders, String quality) {
+		startDownload(url, savePath, format, trimSection, preciseCut, observer, referer, requestHeaders);
+	}
+
 	List<String> extractPlaylistLinks(String playlistUrl) throws Exception;
 }

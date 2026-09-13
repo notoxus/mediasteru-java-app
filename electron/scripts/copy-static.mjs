@@ -10,4 +10,5 @@ const output = resolve(electronRoot, 'dist', 'renderer');
 await mkdir(output, { recursive: true });
 await cp(resolve(electronRoot, 'static'), output, { recursive: true, force: true });
 await cp(resolve(electronRoot, 'dist', 'renderer.js'), resolve(output, 'renderer.js'), { force: true });
+await cp(resolve(electronRoot, 'dist', 'hunter-renderer.js'), resolve(output, 'hunter-renderer.js'), { force: true });
 await cp(resolve(projectRoot, 'assets', 'logo.png'), resolve(output, 'logo.png'), { force: true });

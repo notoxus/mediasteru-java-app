@@ -59,8 +59,14 @@ public class NeccessaryToolsAdapter implements DownloadStrategy {
 	@Override
 	public void startDownload(String url, String savePath, String format, String trimSection, boolean preciseCut,
 			Observer o, String referer, Map<String, String> requestHeaders) {
+		startDownload(url, savePath, format, trimSection, preciseCut, o, referer, requestHeaders, "best");
+	}
+
+	@Override
+	public void startDownload(String url, String savePath, String format, String trimSection, boolean preciseCut,
+			Observer o, String referer, Map<String, String> requestHeaders, String quality) {
 		try {
-			System.out.println("Processing format: " + format.toUpperCase() + "...");
+			System.out.println("Processing format: " + format.toUpperCase() + " (" + quality + ")...");
 
 			String outputTemplate = savePath + File.separator + "%(title)s.%(ext)s";
 
@@ -75,6 +81,7 @@ public class NeccessaryToolsAdapter implements DownloadStrategy {
 				String name = header.getKey();
 				String value = header.getValue();
 				if (name == null || value == null || name.isBlank() || value.isBlank()
+						|| !name.matches("[!#$%&'*+\\-.^_`|~0-9A-Za-z]+") || value.contains("\r") || value.contains("\n")
 						|| name.equalsIgnoreCase("host") || name.equalsIgnoreCase("content-length")
 						|| name.equalsIgnoreCase("connection") || name.equalsIgnoreCase("referer")) {
 					continue;
@@ -112,7 +119,7 @@ public class NeccessaryToolsAdapter implements DownloadStrategy {
 				// Download the best streams first.  MP4 is handled below after yt-dlp
 				// has produced an MKV intermediate, so an MP4-only format filter would
 				// unnecessarily discard higher-quality VP9/AV1 streams.
-				commandList.add("bestvideo+bestaudio/best");
+				commandList.add(videoFormatSelector(quality));
 				commandList.add("--merge-output-format");
 				commandList.add("mkv");
 				commandList.add("--remux-video");
@@ -130,7 +137,7 @@ public class NeccessaryToolsAdapter implements DownloadStrategy {
 
 			} else {
 				commandList.add("-f");
-				commandList.add("bestvideo+bestaudio/best");
+				commandList.add(videoFormatSelector(quality));
 				commandList.add("--remux-video");
 				commandList.add("mkv");
 			}
@@ -206,6 +213,13 @@ public class NeccessaryToolsAdapter implements DownloadStrategy {
 		}
 	}
 
+	private String videoFormatSelector(String quality) {
+		if (quality == null || quality.isBlank() || quality.equalsIgnoreCase("best")) {
+			return "bestvideo+bestaudio/best";
+		}
+		return "bestvideo[height<=?" + quality + "]+bestaudio/best[height<=?" + quality + "]";
+	}
+
 	/**
 	 * Some players expose an obfuscated HLS endpoint which works in the browser
 	 * but makes yt-dlp's generic extractor receive HTTP 414. Try the URL directly
@@ -224,6 +238,7 @@ public class NeccessaryToolsAdapter implements DownloadStrategy {
 			String name = header.getKey();
 			String value = header.getValue();
 			if (name == null || value == null || name.isBlank() || value.isBlank()
+					|| !name.matches("[!#$%&'*+\\-.^_`|~0-9A-Za-z]+") || value.contains("\r") || value.contains("\n")
 					|| name.equalsIgnoreCase("host") || name.equalsIgnoreCase("content-length")
 					|| name.equalsIgnoreCase("connection") || name.equalsIgnoreCase("referer")) {
 				continue;

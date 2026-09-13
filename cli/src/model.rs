@@ -57,6 +57,51 @@ pub struct LibraryResponse {
     pub items: Vec<LibraryItem>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaybackState {
+    pub status: String,
+    pub item_id: Option<i64>,
+    pub title: Option<String>,
+    pub local_path: Option<String>,
+    pub media_kind: Option<String>,
+    pub position: f64,
+    pub duration: f64,
+    pub volume: f64,
+    pub queue_index: i64,
+    pub queue_length: usize,
+}
+
+impl PlaybackState {
+    pub fn idle() -> Self {
+        Self {
+            status: "idle".to_owned(),
+            item_id: None,
+            title: None,
+            local_path: None,
+            media_kind: None,
+            position: 0.0,
+            duration: 0.0,
+            volume: 100.0,
+            queue_index: -1,
+            queue_length: 0,
+        }
+    }
+
+    pub fn progress(&self) -> f64 {
+        if self.duration <= 0.0 {
+            0.0
+        } else {
+            (self.position / self.duration).clamp(0.0, 1.0)
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PlayerResponse {
+    pub player: PlaybackState,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct StatusResponse {
     pub app: String,

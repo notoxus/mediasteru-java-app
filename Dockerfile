@@ -39,11 +39,13 @@ WORKDIR /app
 RUN mkdir -p /app/tools /data /downloads && chown -R node:node /app /data /downloads
 COPY --from=electron-builder --chown=node:node /src/electron/dist ./dist
 COPY --from=tools-builder --chown=node:node /out/tools ./tools
-COPY --from=cli-builder /src/cli/target/release/mediasteru /usr/local/bin/mediasteru
+COPY --from=cli-builder /src/cli/target/release/mediasteru /usr/local/libexec/mediasteru
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/mediasteru-entrypoint
+COPY --chmod=755 docker/cli-entrypoint.sh /usr/local/bin/mediasteru
 
-USER node
 VOLUME ["/data", "/downloads"]
 EXPOSE 8765
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:8765/ping').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+ENTRYPOINT ["/usr/local/bin/mediasteru-entrypoint"]
 CMD ["node", "dist/daemon.js"]

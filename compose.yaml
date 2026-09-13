@@ -12,6 +12,8 @@ services:
       MEDIASTERU_CONTROL_TOKEN: "${MEDIASTERU_CONTROL_TOKEN:-}"
       MEDIASTERU_DEFAULT_FORMAT: "${MEDIASTERU_DEFAULT_FORMAT:-mp4}"
       MEDIASTERU_DEFAULT_QUALITY: "${MEDIASTERU_DEFAULT_QUALITY:-1080}"
+      MEDIASTERU_UID: "${MEDIASTERU_UID:-}"
+      MEDIASTERU_GID: "${MEDIASTERU_GID:-}"
     volumes:
       - mediasteru-data:/data
       - ./downloads:/downloads
