@@ -26,7 +26,7 @@ public class UpdateChecker {
 	private static String cachedVersion = null;
 
 	private static final String REPO_OWNER = "notoxus";
-	private static final String REPO_NAME = "mediasteru";
+	private static final String REPO_NAME = "mediasteru-java-app";
 
 	private static final String CONFIG_DIR = System.getProperty("user.home") + File.separator + ".MediaSteru";
 	private static final File SKIP_FILE = new File(CONFIG_DIR, "skipped_version.txt");

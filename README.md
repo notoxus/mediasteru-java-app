@@ -1,14 +1,22 @@
-# MediaSteru
+# MediaSteru Java App (Original Repository)
 
-![Downloads](https://img.shields.io/github/downloads/notoxus/mediasteru/total)
+![Downloads](https://img.shields.io/github/downloads/notoxus/mediasteru-java-app/total)
 
 [How to install the App](Installation.md)
 
-A local-first media downloader with a portable Swing release, a modern Electron/Wayland client in development, and a lightweight Rust terminal client.
+> **Repository layout.** This repository contains the portable **Swing** desktop app only.
+> The other MediaSteru components live in their own repositories:
+>
+> | Repository | Contents |
+> |---|---|
+> | [mediasteru-desktop](https://github.com/notoxus/mediasteru-desktop) | Electron / Wayland desktop client, headless daemon, Docker image |
+> | [mediasteru-clients](https://github.com/notoxus/mediasteru-clients) | Rust CLI/TUI and Android "Send to PC" companion |
+>
+> The Swing app and the Electron app/Docker daemon both listen on port `8765`; run only one of them at a time.
 
 ---
 
-## Quick Start — Portable Desktop Release
+## Quick Start
 
 ### Windows
 Extract the archive and double-click **`run.bat`**.
@@ -20,98 +28,6 @@ chmod +x run.sh
 ```
 
 No Java installation required — a bundled JRE is included.
-
----
-
-## Electron / Wayland Preview
-
-A new Electron desktop client is being developed alongside the Swing application. It uses Chromium's native Wayland backend and contains its own temporary Hunting window, so this preview does not require a browser extension or an installed Chromium-family browser.
-
-```bash
-cd electron
-npm install
-npm start
-```
-
-The first start synchronizes the checksum-verified yt-dlp, FFmpeg, and Deno
-binaries for the current OS/CPU. They are stored in the ignored `tools/`
-directory, so developers do not commit large binaries or update them manually.
-
-Pasted and imported URLs enter a review queue. While Hunting mode is enabled,
-play the intended video and wait for the green **Download video** button to
-appear immediately to the left of the Hunting mode switch. Click it to send the
-detected stream to the review queue. Select the rows you recognize and press
-**Start Selected**; use **Remove** for ads or unwanted streams.
-
-In the Electron queue, a reviewed row begins with **Download**. While active it
-becomes **Pause**, a paused job offers **Resume**, **Cancel** stops but keeps the
-row, and **Remove** deletes the row from the queue.
-
-```bash
-cd electron
-npm run tools:sync   # download/update this machine
-npm run tools:check  # offline checksum verification
-npm run tools:update # refresh manifest + update this machine
-```
-
-The same update can be run from the repository root on every platform:
-
-```bash
-node scripts/update-local-tools.mjs
-```
-
-See [`electron/README.md`](electron/README.md) for implemented features and the remaining migration work. The Swing client remains the release client until feature parity is reached.
-
----
-
-## Rust CLI / TUI
-
-The terminal client follows the rmpc-style separation between a lightweight keyboard-first view and a single media core. It controls the running Electron app through a versioned localhost API, so it does not start a second downloader or write to the SQLite library independently.
-
-```bash
-# Build once
-cargo build --release --manifest-path cli/Cargo.toml
-
-# Start the Electron host, then use another terminal
-./cli/target/release/mediasteru status
-./cli/target/release/mediasteru get "https://example.com/video" --format mp4 --quality 1080
-./cli/target/release/mediasteru library "tutorial"
-./cli/target/release/mediasteru player
-./cli/target/release/mediasteru tui
-```
-
-Running `mediasteru` without a subcommand also opens the TUI. Its main keys are `1`/`2` for Downloads/Library, `a` or `d` to add a URL, `j`/`k` to move, `p` to play, `Space` to pause/resume, `n`/`N` for next/previous, `s` to stop, and `q` to quit. MP3 items use an audio-only playback queue and advance automatically when a track ends.
-
-The control API accepts localhost connections only. Optionally set the same `MEDIASTERU_CONTROL_TOKEN` environment variable for both Electron and the CLI to require a bearer token. See [`cli/README.md`](cli/README.md) for every command.
-
----
-
-## Docker / Podman — Headless CLI Edition
-
-Following [BentoPDF's self-hosted Docker pattern](https://www.bentopdf.com/docs/self-hosting/docker), MediaSteru provides a small Compose file with a persistent service, healthcheck, restart policy, and mounted data. This edition runs the shared media core without Electron; use the bundled CLI/TUI from your terminal.
-
-```bash
-docker pull ghcr.io/notoxus/mediasteru:latest
-docker compose up -d
-```
-
-The CLI is already included in the image, so no host installation or shell alias is required:
-
-```bash
-docker exec mediasteru mediasteru status
-docker exec mediasteru mediasteru get "https://example.com/video" --quality 1080
-docker exec -it mediasteru mediasteru # opens the TUI
-```
-
-`docker exec mediasteru ...` runs the bundled CLI inside the already-running `mediasteru` container; it does not install, copy, or build another application on the host. The optional `-it` only attaches an interactive terminal, which the full-screen TUI needs. This keeps the setup independent of Bash, Zsh, Fish, PowerShell, and the desktop environment.
-
-Downloaded files appear in `./downloads`; SQLite data and bounded logs use the `mediasteru-data` volume. Port `8765` remains available for the Android companion. Because the container is headless, browser-window Hunting and host mpv playback remain desktop-client features.
-
-On startup, the container normalizes the mounted folders and then drops to the detected non-root UID/GID before launching MediaSteru. This prevents Docker-created `./downloads` directories from causing `Permission denied` failures. Unusual Linux ownership mappings can be overridden with `MEDIASTERU_UID` and `MEDIASTERU_GID`.
-
-The Compose file pulls `ghcr.io/notoxus/mediasteru:latest` and can also build from the local Dockerfile. Published images support Linux AMD64 and ARM64.
-
-If port `8765` is already occupied, start with `MEDIASTERU_HOST_PORT=9876 docker compose up -d`. The service still listens on `8765` inside the container, so the bundled CLI needs no extra configuration.
 
 ---
 
@@ -130,13 +46,10 @@ If port `8765` is already occupied, start with `MEDIASTERU_HOST_PORT=9876 docker
 | **Auto-Update (engine)** | yt-dlp self-updates in the background on every launch, so site extractors stay fresh |
 | **Auto-Update (app)** | On launch the app checks GitHub for a newer release and can download the ready-to-use package for your exact OS/architecture |
 | **Trim Before Download** | Cut a specific section (e.g. 01:30 → 02:45) and download only that clip — no full download needed |
-| **Local Library (Electron)** | Completed media is indexed in SQLite and can be searched, revealed, copied, or played through mpv |
-| **CLI / TUI (Electron host)** | Control the same queue and library from a small Rust terminal client |
-| **Music Player (CLI / TUI)** | Play downloaded MP3s with Now Playing progress, pause/resume, previous/next, stop, and automatic queue advance through mpv |
 
 ---
 
-## How to Download — Portable Swing Client
+## How to Download?
 
 ### Method 1 — Direct URL (YouTube, TikTok, etc.)
 
@@ -232,7 +145,7 @@ context via HTTP POST to `localhost:8765`, where it enters the review queue.
 ## Requirements
 
 - **OS:** Windows 10+, macOS 12+, or Linux (x64/ARM)
-- **Browser (Swing Hunting):** A Chromium-based browser such as Helium, Google Chrome, Chromium, Brave, Microsoft Edge, Vivaldi, Opera, or Thorium. Electron Hunting uses its built-in Chromium window instead.
+- **Browser (Swing Hunting):** A Chromium-based browser such as Helium, Google Chrome, Chromium, Brave, Microsoft Edge, Vivaldi, Opera, or Thorium. The Electron client ([mediasteru-desktop](https://github.com/notoxus/mediasteru-desktop)) uses its built-in Chromium window instead.
 - **Internet:** Required to resolve and download online media. The launcher also needs it once if the bundled JRE must be restored from Adoptium.
 
 ---
@@ -251,84 +164,9 @@ Outputs are in `target/` — platform-specific archives for Windows, macOS (x64/
 
 > **Note:** The release archives bundle a trimmed JRE built automatically by CI (`jlink`). When building locally, the `tools/jre-*/` directories must be present for the assembly to include them. The launchers (`run.bat` / `run.sh`) will fall back to auto-downloading a JRE from Adoptium if the folder is missing.
 
-### Electron client
-
-Requirements: Node.js 22+ and npm.
-
-```bash
-cd electron
-npm install
-npm start
-```
-
-### Terminal client
-
-Requirements: Rust 1.88+ and Cargo. Electron must be running because it owns the shared media core.
-
-```bash
-cargo build --release --locked --manifest-path cli/Cargo.toml
-./cli/target/release/mediasteru tui
-```
-
----
-
-## Git Tag & Release Management
-
-The GitHub Actions CI automatically builds multi-platform packages and publishes a GitHub Release whenever a new tag matching `v*.*.*` is pushed.
-
-### 1. Create and Push a New Tag (Release)
-
-Use the `./bump-version.sh` script to automatically bump the version and synchronize all project files:
-
-```bash
-# Auto-bump patch version from the latest tag (e.g. v1.0.5 -> v1.0.6):
-./bump-version.sh
-
-# Or specify an explicit version:
-./bump-version.sh [new version]
-# For example:
-./bump-version.sh 1.0.6
-
-# Commit the version changes and create the tag:
-git commit -am "release: v1.0.6"
-git tag v1.0.6
-
-# Push code and tag to GitHub to trigger CI release build:
-git push origin main
-git push origin v1.0.6
-```
-
-### 2. Delete a Tag
-
-When you need to delete an incorrect or broken tag:
-
-- **Delete local tag:**
-  ```bash
-  git tag -d v1.0.6
-  ```
-- **Delete remote tag on GitHub:**
-  ```bash
-  git push origin --delete v1.0.6
-  ```
-- *(Optional)* If GitHub already created a Release for that tag, go to **Releases** on GitHub and click **Delete release**.
-
-### 3. Overwrite / Force Update a Tag
-
-When you need to update an existing tag to point to a newer commit without changing the version number:
-
-```bash
-# 1. Update the local tag to point to the current commit (using -f / --force):
-git tag -f v1.0.6
-
-# 2. Force-push the updated tag to GitHub:
-git push origin -f v1.0.6
-```
-
----
-
 ## Troubleshooting
 
-Both desktop clients keep technical output away from the primary interface. In Swing, click **Show details** when you need it. Electron presents warnings and errors in native dialogs while diagnostics continue to the launching terminal and its bounded log file. Swing logs live under `~/.MediaSteru/logs/`; Electron uses the operating system's standard application-data directory.
+The Swing client keeps technical output away from the primary interface. Click **Show details** when you need it. Logs live under `~/.MediaSteru/logs/`. Troubleshooting for the Electron client is documented in the [mediasteru-desktop](https://github.com/notoxus/mediasteru-desktop) repository.
 
 **The Download label does not appear**
 - Make sure the app is running before you open the capture browser.
@@ -338,7 +176,6 @@ Both desktop clients keep technical output away from the primary interface. In S
 - Some sites use DRM (Widevine) — encrypted streams cannot be downloaded.
 
 **Download fails with an error**
-- In a development checkout, run `cd electron && npm run tools:sync` to restore the pinned, checksum-verified engine tools.
 - In a portable release, restart the app to let its dependency check restore a missing yt-dlp binary.
 - Some sites require cookies. Open the site normally in browser (logged in), then use Hunting mode.
 
@@ -346,9 +183,7 @@ Both desktop clients keep technical output away from the primary interface. In S
 - Delete `~/.MediaSteru/Extension/` and restart the app to regenerate it.
 
 **yt-dlp warns "No supported JavaScript runtime could be found"**
-- Deno is now bundled in releases and synchronized for development from
-  `tools-manifest.json`. Run `npm run tools:sync` inside `electron/` if an old
-  checkout still shows this warning.
+- Deno is bundled in the Java desktop release with the other engine tools.
 
 ---
 
@@ -357,11 +192,11 @@ Both desktop clients keep technical output away from the primary interface. In S
 `tools-manifest.json` is the single source of truth for yt-dlp, FFmpeg, and
 Deno versions, target filenames, download URLs, and SHA-256 hashes.
 
-- `npm run tools:update` refreshes the small manifest and downloads only the
+- `node scripts/update-local-tools.mjs` refreshes the small manifest and downloads only the
   binaries for the current machine. The large binaries remain Git-ignored.
 - `.github/workflows/release.yml` downloads every platform binary into its
   temporary runner workspace from the same manifest; no binary is committed.
 - `.github/workflows/dependency-check.yml` rejects mismatched app versions or
   Java/JRE versions before a forgotten `pom.xml` update reaches a release tag.
-- `.github/workflows/ci.yml` builds Java and Electron in clean containers on
+- `.github/workflows/ci.yml` builds Java in a clean container on
   pushes and pull requests.

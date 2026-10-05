@@ -1,4 +1,4 @@
-name: CI
+name: Java App CI
 
 on:
   push:
@@ -6,37 +6,9 @@ on:
 
 jobs:
   java:
-    name: Java build in container
+    name: Maven package
     runs-on: ubuntu-latest
     container: maven:3.9.11-eclipse-temurin-21
     steps:
       - uses: actions/checkout@v5
       - run: mvn package -DskipDistributionAssembly=true --no-transfer-progress
-
-  electron:
-    name: Electron typecheck in container
-    runs-on: ubuntu-latest
-    container: node:22-bookworm-slim
-    defaults:
-      run:
-        working-directory: electron
-    steps:
-      - uses: actions/checkout@v5
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
-
-  cli:
-    name: Rust CLI and TUI
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: cli
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: cli
-      - run: cargo test --locked
-      - run: cargo build --release --locked

@@ -1,16 +1,16 @@
 # 🚀 Installation Guide
 
-Welcome to the setup guide for the current **MediaSteru Swing desktop release**. It is **Plug & Play** — no system Java installation is required because the release archive is self-contained.
+Welcome to the setup guide for the current **MediaSteru Java App**. It is **Plug & Play** — no system Java installation is required because the release archive is self-contained.
 
 ## Step 1: Requirements
 
-* **Browser Hunting:** Requires a Chromium-based browser, including Helium, Google Chrome, Chromium, Brave, Microsoft Edge, Vivaldi, Opera, Thorium, and compatible derivatives. The app loads its Hunting extension automatically; no manual `manifest.json` setup is needed. On Linux, executable browser AppImages in `~/Applications`, `~/.local/bin`, or `~/Downloads` are also detected.
-* **No Java needed!** A trimmed Java 21 Runtime Environment (JRE) is bundled inside every release package.
-  * If the JRE is somehow missing, the launcher will **automatically download it** from [Adoptium](https://adoptium.net) on first run (internet required for that one-time step only).
+* **Browser Hunting:** Requires a Chromium-based browser, including Helium, Google Chrome, Chromium, Brave, Microsoft Edge, Vivaldi, Opera, Thorium, and compatible derivatives.
+
+And you don't need anything else to setting it up, because it was packaged by me.
 
 ## Step 2: Installing the App
 
-1. Navigate to the **[Releases](https://github.com/notoxus/mediasteru/releases)** page of this repository.
+1. Navigate to the **[Releases](https://github.com/notoxus/mediasteru-java-app/releases)** page of this repository.
 2. Download the archive that matches your Operating System:
    * **Windows:** `MediaSteru-v1.0.6-Win.zip`
    * **macOS:**
@@ -19,13 +19,12 @@ Welcome to the setup guide for the current **MediaSteru Swing desktop release**.
    * **Linux:**
      * `MediaSteru-v1.0.6-Linux-x64.tar.gz` (x64)
      * `MediaSteru-v1.0.6-Linux-ARM.tar.gz` (ARM64)
-   * **Android companion:** `MediaSteru-v1.0.6-remote-desktop.apk` — sends shared links from the phone to the desktop app. The workflow does not currently publish a standalone Android downloader.
 
 ## 📂 Package Structure (What's Inside)
 
 Once extracted, your installation folder contains:
 
-* **Core App:** `MediaSteru.jar` — the main compiled application.
+* **Core App:** `mediasteru-java-app.jar` — the main compiled application.
 * **Launcher Script:** `run.bat` (Windows) or `run.sh` (Mac/Linux) — starts the app.
 * **Embedded Runtime:** A trimmed JRE 21 tailored for your platform, built automatically by CI using `jlink`.
 * **Engine Tools:** checksum-verified `yt-dlp`, `ffmpeg`, and `deno` binaries
@@ -72,46 +71,6 @@ The app uses a 175% interface scale on Linux because some Wayland compositors do
 MEDIASTERU_UI_SCALE=150% ./run.sh
 # or use 1.0 to restore the unscaled size
 ```
-
-### For Android Companion Users
-
-Install the `-remote-desktop.apk` file and allow installation from unknown sources when prompted. The phone and desktop must be on the same local network, and the desktop app must be running.
-
-## Electron Preview and Terminal Client
-
-The Electron/Wayland desktop client and Rust terminal client are currently developer builds rather than packaged release assets. Build and start Electron first, then run the terminal client in another terminal:
-
-```bash
-cd electron
-npm install
-npm start
-
-# In another terminal, from the repository root:
-cargo run --manifest-path cli/Cargo.toml -- tui
-```
-
-See [`electron/README.md`](electron/README.md) and [`cli/README.md`](cli/README.md) for details.
-
-## Docker / Podman Headless Installation
-
-The container edition runs MediaSteru as a background service and includes the terminal client. It does not require Java, Node.js, Rust, Electron, yt-dlp, FFmpeg, or Deno on the host.
-
-```bash
-git clone https://github.com/notoxus/mediasteru.git
-cd mediasteru
-mkdir -p downloads
-docker compose up -d
-alias mediasteru="$PWD/docker/mediasteru"
-
-mediasteru status
-mediasteru tui
-```
-
-Use `docker compose pull && docker compose up -d` to update. Files are written to `./downloads`, while the media library and logs persist in the `mediasteru-data` Docker volume.
-
-Set `MEDIASTERU_HOST_PORT=9876` before `docker compose up -d` when the default host port `8765` is already occupied. For a local image build, use `MEDIASTERU_IMAGE=mediasteru:local docker compose up -d --build`.
-
-The container is intended for direct downloads, CLI/TUI use, and Android Companion submissions. Use the Electron or Swing desktop client when you need an interactive Hunting browser; containerized mpv playback is not connected to the host desktop.
 
 ---
 

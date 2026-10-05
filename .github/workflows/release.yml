@@ -259,81 +259,6 @@ jobs:
           path: tools/jre-linux-arm/
           retention-days: 1
 
-  # Build Android APKs
-  # Need 4 GitHub Secrets:
-  #   KEYSTORE_BASE64
-  #   KEYSTORE_PASSWORD
-  #   KEY_ALIAS
-  #   KEY_PASSWORD
-  build-android:
-    name: Build Android APKs
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Check keystore secret
-        id: guard
-        env:
-          SECRET: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "$SECRET" ]; then
-            echo "built=false" >> $GITHUB_OUTPUT
-            echo "::warning::KEYSTORE_BASE64 not set — Android build skipped"
-          else
-            echo "built=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Set up Java 17 (Android build)
-        if: steps.guard.outputs.built == 'true'
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Decode keystore from secret
-        if: steps.guard.outputs.built == 'true'
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" \
-            | grep -v '\-\-\-' \
-            | tr -d '\r\n ' \
-            | base64 --decode > keystore/release.jks
-          echo "Keystore size: $(wc -c < keystore/release.jks) bytes"
-
-      - name: Write keystore.properties (companion app)
-        if: steps.guard.outputs.built == 'true'
-        run: |
-          cat > companion-android/keystore.properties <<EOF
-          storeFile=../keystore/release.jks
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
-
-      - name: Make gradlew executable
-        if: steps.guard.outputs.built == 'true'
-        run: |
-          chmod +x companion-android/gradlew
-
-      - name: Build companion APK (signed release)
-        if: steps.guard.outputs.built == 'true'
-        working-directory: companion-android
-        run: ./gradlew assembleRelease --no-daemon
-
-      - name: Rename APKs to release filenames
-        if: steps.guard.outputs.built == 'true'
-        run: |
-          VERSION=${GITHUB_REF_NAME}
-          cp companion-android/app/build/outputs/apk/release/app-release.apk \
-             "MediaSteru-${VERSION}-remote-desktop.apk"
-
-      - name: Upload APK artifacts
-        if: steps.guard.outputs.built == 'true'
-        uses: actions/upload-artifact@v5
-        with:
-          name: android-apks
-          path: "MediaSteru-*.apk"
-          retention-days: 1
-
   # Create GitHub release
   package-and-release:
     name: Package & Create GitHub Release
@@ -344,8 +269,6 @@ jobs:
       - build-jre-mac-arm
       - build-jre-linux-x64
       - build-jre-linux-arm
-      - build-android
-    if: always() && !failure() && !cancelled()
     permissions:
       contents: write
 
@@ -407,13 +330,6 @@ jobs:
 
       - name: Verify synchronized engine tools
         run: node scripts/sync-tools.mjs --all --check
-      - name: Download Android APKs
-        if: needs.build-android.result == 'success'
-        uses: actions/download-artifact@v5
-        with:
-          name: android-apks
-          path: apks/
-
       - name: Fix JRE permissions (Mac/Linux)
         run: |
           chmod -R +x tools/jre-mac-x64/bin/ tools/jre-mac-x64/lib/ || true
@@ -435,7 +351,7 @@ jobs:
         run: mvn package --no-transfer-progress
 
       - name: List generated packages
-        run: ls -lh target/MediaSteru-*.zip target/MediaSteru-*.tar.gz apks/ || true
+        run: ls -lh target/MediaSteru-*.zip target/MediaSteru-*.tar.gz
 
       - name: Create GitHub Release & upload desktop assets
         id: release
@@ -450,11 +366,3 @@ jobs:
             target/MediaSteru-v${{ steps.version.outputs.VERSION }}-Mac-AppleSilicon.tar.gz
             target/MediaSteru-v${{ steps.version.outputs.VERSION }}-Linux-x64.tar.gz
             target/MediaSteru-v${{ steps.version.outputs.VERSION }}-Linux-ARM.tar.gz
-
-      - name: Upload Android APKs to Release
-        if: needs.build-android.result == 'success'
-        uses: softprops/action-gh-release@v2.3.2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: |
-            apks/MediaSteru-${{ github.ref_name }}-remote-desktop.apk

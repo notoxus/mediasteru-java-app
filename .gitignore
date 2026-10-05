@@ -1,14 +1,5 @@
 target/
-cli/target/
-
-# Android release signing — never commit the keystore or its passwords
-# (README.md inside keystore/ is intentionally kept — see the negation below)
-keystore/*
-!keystore/README.md
-keystore.properties
-android/keystore.properties
-companion-android/keystore.properties
-
+keystore/*.jks
 tools/jre-win/
 tools/jre-mac-x64/
 tools/jre-mac-arm/
@@ -26,3 +17,4 @@ tools/.tool-state.json
 .idea/
 *.iml
 .settings/
+.metadata/
