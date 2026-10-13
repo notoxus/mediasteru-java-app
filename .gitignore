@@ -1,20 +1,21 @@
+# Build
 target/
-keystore/*.jks
-tools/jre-win/
-tools/jre-mac-x64/
-tools/jre-mac-arm/
-tools/jre-linux-x64/
-tools/jre-linux-arm/
+*.class
 
+# Tools: binary tải bằng scripts/sync-tools.mjs, JRE do release.yml tạo
+tools/jre-*/
 tools/node*
 tools/ffmpeg*
 tools/ffprobe*
 tools/yt-dlp*
-tools/yt-dlp
 tools/deno*
 tools/.tool-state.json
-# IDE ignore
+
+# IDE / OS
+.metadata/
+.settings/
+.classpath
+.project
 .idea/
 *.iml
-.settings/
-.metadata/
+.DS_Store
